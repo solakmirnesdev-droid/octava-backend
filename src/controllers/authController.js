@@ -1,5 +1,5 @@
 import User from '../models/User.js';
-import { signToken } from '../utils/jwt.js';
+import { issueSession, clearSession } from '../utils/session.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -27,7 +27,7 @@ export async function register(req, res, next) {
       // Worker and admin roles are granted deliberately, never requested.
     });
 
-    res.status(201).json({ token: signToken(user), user: user.toPublic() });
+    res.status(201).json({ token: issueSession(res, user), user: user.toPublic() });
   } catch (err) {
     next(err);
   }
@@ -51,7 +51,7 @@ export async function login(req, res, next) {
     user.lastLoginAt = new Date();
     await user.save();
 
-    res.json({ token: signToken(user), user: user.toPublic() });
+    res.json({ token: issueSession(res, user), user: user.toPublic() });
   } catch (err) {
     next(err);
   }
@@ -80,7 +80,7 @@ export async function loginStaff(req, res, next) {
     user.lastLoginAt = new Date();
     await user.save();
 
-    res.json({ token: signToken(user), user: user.toPublic() });
+    res.json({ token: issueSession(res, user), user: user.toPublic() });
   } catch (err) {
     next(err);
   }
@@ -88,4 +88,9 @@ export async function loginStaff(req, res, next) {
 
 export async function me(req, res) {
   res.json({ user: req.user.toPublic() });
+}
+
+export async function logout(_req, res) {
+  clearSession(res);
+  res.json({ ok: true });
 }

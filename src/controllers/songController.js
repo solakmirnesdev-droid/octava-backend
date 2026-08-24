@@ -1,0 +1,241 @@
+import mongoose from 'mongoose';
+import Song from '../models/Song.js';
+import Artist from '../models/Artist.js';
+import Genre from '../models/Genre.js';
+import { readPaging, pageMeta } from '../utils/pagination.js';
+
+/** Escapes user input before it is used inside a RegExp. */
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Resolves genre slugs or ids to ObjectIds, dropping anything unrecognised. */
+async function resolveGenres(input) {
+  if (!input?.length) return [];
+  const values = Array.isArray(input) ? input : [input];
+
+  const ids = values.filter((v) => mongoose.isValidObjectId(v));
+  const slugs = values.filter((v) => !mongoose.isValidObjectId(v));
+
+  const found = await Genre.find({
+    $or: [{ _id: { $in: ids } }, { slug: { $in: slugs } }]
+  }).select('_id');
+
+  return found.map((g) => g._id);
+}
+
+/** Workers address songs by id from the editor; visitors use the slug. */
+function byIdOrSlug(identifier) {
+  return mongoose.isValidObjectId(identifier)
+    ? { _id: identifier }
+    : { slug: identifier };
+}
+
+/** Drafts are visible to staff only. */
+function visibilityFilter(user) {
+  return user && user.role !== 'user' ? {} : { status: 'published' };
+}
+
+export async function list(req, res, next) {
+  try {
+    const paging = readPaging(req.query);
+    const filter = { ...visibilityFilter(req.user) };
+
+    if (req.query.genre) {
+      const genre = await Genre.findOne({ slug: req.query.genre });
+      if (!genre) return res.json({ songs: [], meta: pageMeta(0, paging) });
+      filter.genres = genre._id;
+    }
+
+    const sort = req.query.sort === 'popular'
+      ? { views: -1, createdAt: -1 }
+      : req.query.sort === 'title' ? { title: 1 } : { createdAt: -1 };
+
+    const [songs, total] = await Promise.all([
+      Song.find(filter)
+        .populate('artist', 'name slug')
+        .populate('genres', 'name slug')
+        .sort(sort)
+        .skip(paging.skip)
+        .limit(paging.limit),
+      Song.countDocuments(filter)
+    ]);
+
+    res.json({ songs: songs.map((s) => s.toPublic()), meta: pageMeta(total, paging) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function search(req, res, next) {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json({ songs: [], artists: [], genres: [] });
+
+    const pattern = new RegExp(escapeRegex(q), 'i');
+
+    // One query cannot answer "did they mean a song, a performer, or a rubric",
+    // so all three are searched and returned separately for the UI to group.
+    const [artists, genres] = await Promise.all([
+      Artist.find({ name: pattern }).select('name slug songCount').limit(10),
+      Genre.find({ name: pattern }).select('name slug').limit(10)
+    ]);
+
+    const songs = await Song.find({
+      ...visibilityFilter(req.user),
+      $or: [
+        { title: pattern },
+        { artist: { $in: artists.map((a) => a._id) } }
+      ]
+    })
+      .populate('artist', 'name slug')
+      .populate('genres', 'name slug')
+      .sort({ views: -1 })
+      .limit(50);
+
+    res.json({ songs: songs.map((s) => s.toPublic()), artists, genres });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getOne(req, res, next) {
+  try {
+    const song = await Song.findOne({
+      ...byIdOrSlug(req.params.identifier),
+      ...visibilityFilter(req.user)
+    }).populate('artist', 'name slug');
+
+    if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
+
+    // Fire-and-forget: a failed counter must never fail the page.
+    Song.updateOne({ _id: song._id }, { $inc: { views: 1 } }).catch(() => {});
+
+    res.json({ song: song.toPublic(req.query.arrangement) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function create(req, res, next) {
+  try {
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, label } = req.body;
+
+    if (!title || !artist || !content || !originalKey) {
+      return res.status(400).json({ message: 'Naslov, izvođač, tekst i tonalitet su obavezni.' });
+    }
+
+    const artistDoc = await Artist.findOrCreateByName(artist);
+    if (!artistDoc) return res.status(400).json({ message: 'Izvođač je obavezan.' });
+
+    const genreIds = await resolveGenres(genres);
+
+    const song = await Song.create({
+      title,
+      artist: artistDoc._id,
+      genres: genreIds,
+      tags,
+      status: status === 'published' ? 'published' : 'draft',
+      createdBy: req.user._id,
+      updatedBy: req.user._id,
+      arrangements: [{
+        label: label || 'Osnovna verzija',
+        content,
+        originalKey,
+        capo: capo || 0,
+        difficulty: difficulty || 'medium',
+        isPrimary: true,
+        createdBy: req.user._id
+      }]
+    });
+
+    await Artist.updateOne(
+      { _id: artistDoc._id },
+      { $inc: { songCount: 1 }, $addToSet: { genres: { $each: genreIds } } }
+    );
+    await Genre.updateMany({ _id: { $in: genreIds } }, { $inc: { songCount: 1 } });
+
+    await song.populate('artist', 'name slug');
+    await song.populate('genres', 'name slug');
+
+    res.status(201).json({ song: song.toPublic() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function update(req, res, next) {
+  try {
+    const song = await Song.findOne(byIdOrSlug(req.params.identifier));
+    if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
+
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, arrangementId } = req.body;
+
+    if (title) song.title = title;
+    if (tags) song.tags = tags;
+
+    if (genres) {
+      const next = await resolveGenres(genres);
+      const before = song.genres.map(String);
+      const after = next.map(String);
+
+      // Keep the per-genre counters honest across a re-categorisation.
+      await Genre.updateMany(
+        { _id: { $in: before.filter((id) => !after.includes(id)) } },
+        { $inc: { songCount: -1 } }
+      );
+      await Genre.updateMany(
+        { _id: { $in: after.filter((id) => !before.includes(id)) } },
+        { $inc: { songCount: 1 } }
+      );
+
+      song.genres = next;
+      await Artist.updateOne({ _id: song.artist }, { $addToSet: { genres: { $each: next } } });
+    }
+    if (status) song.status = status === 'published' ? 'published' : 'draft';
+
+    if (artist) {
+      const artistDoc = await Artist.findOrCreateByName(artist);
+      if (artistDoc && !artistDoc._id.equals(song.artist)) {
+        await Artist.updateOne({ _id: song.artist }, { $inc: { songCount: -1 } });
+        await Artist.updateOne({ _id: artistDoc._id }, { $inc: { songCount: 1 } });
+        song.artist = artistDoc._id;
+      }
+    }
+
+    const target = arrangementId ? song.arrangements.id(arrangementId) : song.primary;
+    if (target) {
+      // Snapshot the previous text before overwriting, so an accidental
+      // paste-over can be recovered.
+      if (content && content !== target.content) {
+        song.history.push({ content: target.content, editedBy: req.user._id });
+        target.content = content;
+      }
+      if (originalKey) target.originalKey = originalKey;
+      if (capo !== undefined) target.capo = capo;
+      if (difficulty) target.difficulty = difficulty;
+    }
+
+    song.updatedBy = req.user._id;
+    await song.save();
+    await song.populate('artist', 'name slug');
+    await song.populate('genres', 'name slug');
+
+    res.json({ song: song.toPublic() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function remove(req, res, next) {
+  try {
+    const song = await Song.findOne(byIdOrSlug(req.params.identifier));
+    if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
+
+    await Artist.updateOne({ _id: song.artist }, { $inc: { songCount: -1 } });
+    await Genre.updateMany({ _id: { $in: song.genres } }, { $inc: { songCount: -1 } });
+    await song.deleteOne();
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}

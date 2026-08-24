@@ -1,5 +1,16 @@
 import { verifyToken } from '../utils/jwt.js';
+import { SESSION_COOKIE } from '../utils/session.js';
 import User from '../models/User.js';
+
+/**
+ * Two clients, two transports: the server-rendered app sends an httpOnly
+ * cookie, the dashboard SPA sends a Bearer header. Either is accepted.
+ */
+function readToken(req) {
+  const [scheme, token] = (req.headers.authorization || '').split(' ');
+  if (scheme === 'Bearer' && token) return token;
+  return req.cookies?.[SESSION_COOKIE] || null;
+}
 
 /**
  * Populates req.user from a Bearer token, or 401s.
@@ -9,10 +20,8 @@ import User from '../models/User.js';
  * waiting out the token's expiry.
  */
 export async function requireAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const [scheme, token] = header.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
+  const token = readToken(req);
+  if (!token) {
     return res.status(401).json({ message: 'Prijava je obavezna.' });
   }
 
@@ -39,8 +48,8 @@ export function requireRole(...roles) {
 
 /** Attaches req.user when a token is present, but never rejects. */
 export async function optionalAuth(req, _res, next) {
-  const [scheme, token] = (req.headers.authorization || '').split(' ');
-  if (scheme === 'Bearer' && token) {
+  const token = readToken(req);
+  if (token) {
     try {
       req.user = await User.findById(verifyToken(token).sub);
     } catch {

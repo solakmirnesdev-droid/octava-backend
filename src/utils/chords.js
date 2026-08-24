@@ -17,8 +17,38 @@
 const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SCALE  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-// Keys conventionally written with flats rather than sharps.
-const FLAT_KEYS = new Set(['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm']);
+/**
+ * Conventional spelling for every key, following the circle of fifths.
+ *
+ * Transposing by pitch alone is not enough: A#, D# and G# are correct pitches
+ * but nobody writes a chart in them. Db is five flats where C# is seven sharps,
+ * so Db wins; C#m is four sharps where Dbm is eight flats, so C#m wins.
+ */
+const MAJOR_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const MINOR_KEYS = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'];
+
+/** Keys whose signature is written with flats. Everything else uses sharps. */
+const FLAT_KEYS = new Set([
+  'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb',
+  'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'
+]);
+
+/** Splits a key name into its pitch class and mode. */
+function parseKey(key) {
+  const match = /^([A-H][#b]?)(m(?!aj))?$/.exec((key || '').trim());
+  if (!match) return null;
+
+  const [, root, minor] = match;
+  const index = noteToIndex(root[0], root[1] || '');
+  if (index === -1) return null;
+
+  return { pitchClass: index, isMinor: Boolean(minor) };
+}
+
+/** Whether a chart in this key should be written with flats. */
+export function prefersFlats(key) {
+  return FLAT_KEYS.has((key || '').trim());
+}
 
 const CHORD_TOKEN = /\[([^\]]*)\]/g;
 
@@ -90,17 +120,20 @@ export function transposeChord(chord, semitones, preferFlats = false) {
 /**
  * Transpose every chord token in a song body, leaving lyrics untouched.
  *
- * @param {string} content   ChordPro-style song body
- * @param {number} semitones -11..11, the shift to apply
- * @param {string} [targetKey] used only to decide sharps vs flats in the output
+ * @param {string} content       ChordPro-style song body
+ * @param {number} semitones     the shift to apply
+ * @param {string} [originalKey] the song's own key; the destination key derived
+ *                               from it decides sharp versus flat spelling
  */
-export function transposeContent(content, semitones, targetKey) {
+export function transposeContent(content, semitones, originalKey) {
   if (!content) return content;
 
   const shift = ((semitones % 12) + 12) % 12;
   if (shift === 0) return content;
 
-  const preferFlats = targetKey ? FLAT_KEYS.has(targetKey) : false;
+  const targetKey = originalKey ? transposeKey(originalKey, semitones) : null;
+  // With no key to go on, descending reads more naturally in flats.
+  const preferFlats = targetKey ? prefersFlats(targetKey) : semitones < 0;
 
   return content.replace(CHORD_TOKEN, (token, inner) => {
     if (!inner.trim()) return token;
@@ -120,15 +153,13 @@ export function extractChords(content) {
   return [...seen];
 }
 
-/** Shift a key name by the same interval, for labelling a transposed song. */
+/** The correctly spelled key you land in after shifting by N semitones. */
 export function transposeKey(key, semitones) {
-  if (!key) return key;
+  const parsed = parseKey(key);
+  if (!parsed) return key;
 
-  const isMinor = /m$/.test(key) && !/maj/i.test(key);
-  const root = isMinor ? key.slice(0, -1) : key;
-  const shifted = transposeChord(root, semitones, FLAT_KEYS.has(key));
-
-  return isMinor ? shifted + 'm' : shifted;
+  const target = (((parsed.pitchClass + semitones) % 12) + 12) % 12;
+  return parsed.isMinor ? MINOR_KEYS[target] : MAJOR_KEYS[target];
 }
 
 /** Render Anglo chord names in ex-Yugoslav notation (B natural becomes H). */
