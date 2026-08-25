@@ -29,6 +29,22 @@ const userSchema = new mongoose.Schema(
       select: false
     },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
+    /**
+     * Password reset. Only the hash of the token is kept, so a database leak
+     * yields no usable links.
+     */
+    resetTokenHash: { type: String, select: false },
+    resetTokenExpiresAt: { type: Date, select: false },
+
+    /**
+     * Sessions issued before this moment are refused.
+     *
+     * Tokens are stateless, so without this a reset would leave whoever
+     * already held a session still signed in — which is precisely the person
+     * a reset is meant to remove.
+     */
+    passwordChangedAt: { type: Date, select: false },
+
     lastLoginAt: Date
   },
   { timestamps: true }

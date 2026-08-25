@@ -6,6 +6,7 @@ import {
 import {
   setup, enable, disable, regenerateBackupCodes
 } from '../controllers/twoFactorController.js';
+import { forgot, reset } from '../controllers/resetController.js';
 import { requireUser, requireStaff } from '../middleware/auth.js';
 import { loginLimiter, registerLimiter, authLimiter, twoFactorLimiter } from '../middleware/rateLimit.js';
 
@@ -17,6 +18,11 @@ router.use(authLimiter);
 router.post('/register', registerLimiter, register);
 router.post('/login', loginLimiter, login);
 router.post('/logout', logout);
+
+// Throttled: this endpoint sends mail, so unlimited requests are both a way to
+// spam an address and a way to burn a sending quota.
+router.post('/forgot', registerLimiter, forgot);
+router.post('/reset', loginLimiter, reset);
 router.get('/me', requireUser, me);
 
 // Editors. Separate collection, separate cookie, separate token realm.

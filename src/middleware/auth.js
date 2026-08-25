@@ -4,6 +4,18 @@ import User from '../models/User.js';
 import Staff from '../models/Staff.js';
 
 /**
+ * Refuses a token minted before the password last changed.
+ *
+ * Sessions are stateless, so a reset would otherwise leave whoever already held
+ * one still signed in — exactly the person a reset is meant to remove. The iat
+ * claim is in seconds, so the comparison is floored to match.
+ */
+function issuedBeforePasswordChange(payload, account) {
+  if (!account.passwordChangedAt || !payload.iat) return false;
+  return payload.iat < Math.floor(account.passwordChangedAt.getTime() / 1000);
+}
+
+/**
  * Two clients, two transports: the server-rendered app sends an httpOnly
  * cookie, the dashboard SPA sends a Bearer header. Either is accepted, but the
  * cookie read is realm-specific so the two sessions never cross.
@@ -25,8 +37,11 @@ export async function requireUser(req, res, next) {
 
   try {
     const payload = verifyToken(token, REALM_USER);
-    const user = await User.findById(payload.sub);
+    const user = await User.findById(payload.sub).select('+passwordChangedAt');
     if (!user) return res.status(401).json({ message: 'Nalog više ne postoji.' });
+    if (issuedBeforePasswordChange(payload, user)) {
+      return res.status(401).json({ message: 'Lozinka je promijenjena. Prijavi se ponovo.' });
+    }
 
     req.user = user;
     next();
@@ -41,10 +56,13 @@ export async function requireStaff(req, res, next) {
 
   try {
     const payload = verifyToken(token, REALM_STAFF);
-    const staff = await Staff.findById(payload.sub);
+    const staff = await Staff.findById(payload.sub).select('+passwordChangedAt');
 
     if (!staff) return res.status(401).json({ message: 'Nalog više ne postoji.' });
     if (!staff.active) return res.status(403).json({ message: 'Nalog je deaktiviran.' });
+    if (issuedBeforePasswordChange(payload, staff)) {
+      return res.status(401).json({ message: 'Lozinka je promijenjena. Prijavi se ponovo.' });
+    }
 
     req.staff = staff;
     next();
