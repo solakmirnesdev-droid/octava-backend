@@ -11,8 +11,19 @@ import jwt from 'jsonwebtoken';
  */
 const message = { message: 'Previše pokušaja. Pokušaj ponovo za nekoliko minuta.' };
 
+/**
+ * Counters live in this process's memory, so they survive across tests even
+ * though the database is wiped between them — which made unrelated tests fail
+ * on a throttle they never triggered themselves. Limiting is exercised by its
+ * own suite, which opts back in explicitly.
+ */
+const disabled = process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT !== 'on';
+const passthrough = (_req, _res, next) => next();
+
+const limiter = (options) => (disabled ? passthrough : rateLimit(options));
+
 /** Counts only failures, so a person signing in repeatedly is never punished. */
-export const loginLimiter = rateLimit({
+export const loginLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   skipSuccessfulRequests: true,
@@ -33,7 +44,7 @@ export const loginLimiter = rateLimit({
 });
 
 /** Registration is cheap to abuse and rarely repeated by one person. */
-export const registerLimiter = rateLimit({
+export const registerLimiter = limiter({
   windowMs: 60 * 60 * 1000,
   limit: 5,
   standardHeaders: 'draft-7',
@@ -42,7 +53,7 @@ export const registerLimiter = rateLimit({
 });
 
 /** A wider net over everything under /api/auth, to blunt distributed attempts. */
-export const authLimiter = rateLimit({
+export const authLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   limit: 100,
   standardHeaders: 'draft-7',
@@ -62,7 +73,7 @@ export const authLimiter = rateLimit({
  * chooses a counter. A forged token buys an attacker their own bucket, not a
  * larger allowance.
  */
-export const twoFactorLimiter = rateLimit({
+export const twoFactorLimiter = limiter({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   skipSuccessfulRequests: true,
