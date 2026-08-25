@@ -3,6 +3,7 @@ import Song from '../models/Song.js';
 import Artist from '../models/Artist.js';
 import Genre from '../models/Genre.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
+import { slugify } from '../utils/slug.js';
 
 /** Escapes user input before it is used inside a RegExp. */
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -29,15 +30,15 @@ function byIdOrSlug(identifier) {
     : { slug: identifier };
 }
 
-/** Drafts are visible to staff only. */
-function visibilityFilter(user) {
-  return user && user.role !== 'user' ? {} : { status: 'published' };
+/** Drafts are visible to editors only. */
+function visibilityFilter(staff) {
+  return staff ? {} : { status: 'published' };
 }
 
 export async function list(req, res, next) {
   try {
     const paging = readPaging(req.query);
-    const filter = { ...visibilityFilter(req.user) };
+    const filter = { ...visibilityFilter(req.staff) };
 
     if (req.query.genre) {
       const genre = await Genre.findOne({ slug: req.query.genre });
@@ -68,30 +69,52 @@ export async function list(req, res, next) {
 export async function search(req, res, next) {
   try {
     const q = (req.query.q || '').trim();
-    if (!q) return res.json({ songs: [], artists: [], genres: [] });
+    const paging = readPaging(req.query);
 
-    const pattern = new RegExp(escapeRegex(q), 'i');
+    if (!q) {
+      return res.json({ songs: [], artists: [], genres: [], meta: pageMeta(0, paging) });
+    }
+
+    // Fold the query the same way the stored copies were folded, so "noc",
+    // "noć" and "NOĆ" all reach the same songs.
+    const folded = slugify(q).replace(/-/g, ' ');
+    if (!folded) return res.json({ songs: [], artists: [], genres: [], meta: pageMeta(0, paging) });
+
+    const pattern = new RegExp(escapeRegex(folded), 'i');
 
     // One query cannot answer "did they mean a song, a performer, or a rubric",
     // so all three are searched and returned separately for the UI to group.
+    // Only the songs are paged; the other two are navigation hints and stay
+    // short whatever page the reader is on.
     const [artists, genres] = await Promise.all([
-      Artist.find({ name: pattern }).select('name slug songCount').limit(10),
-      Genre.find({ name: pattern }).select('name slug').limit(10)
+      Artist.find({ searchName: pattern }).select('name slug songCount').limit(10),
+      Genre.find({ name: new RegExp(escapeRegex(q), 'i') }).select('name slug').limit(10)
     ]);
 
-    const songs = await Song.find({
-      ...visibilityFilter(req.user),
+    const filter = {
+      ...visibilityFilter(req.staff),
       $or: [
-        { title: pattern },
+        { searchTitle: pattern },
         { artist: { $in: artists.map((a) => a._id) } }
       ]
-    })
-      .populate('artist', 'name slug')
-      .populate('genres', 'name slug')
-      .sort({ views: -1 })
-      .limit(50);
+    };
 
-    res.json({ songs: songs.map((s) => s.toPublic()), artists, genres });
+    const [songs, total] = await Promise.all([
+      Song.find(filter)
+        .populate('artist', 'name slug')
+        .populate('genres', 'name slug')
+        .sort({ views: -1 })
+        .skip(paging.skip)
+        .limit(paging.limit),
+      Song.countDocuments(filter)
+    ]);
+
+    res.json({
+      songs: songs.map((s) => s.toPublic()),
+      artists,
+      genres,
+      meta: pageMeta(total, paging)
+    });
   } catch (err) {
     next(err);
   }
@@ -101,8 +124,10 @@ export async function getOne(req, res, next) {
   try {
     const song = await Song.findOne({
       ...byIdOrSlug(req.params.identifier),
-      ...visibilityFilter(req.user)
-    }).populate('artist', 'name slug');
+      ...visibilityFilter(req.staff)
+    })
+      .populate('artist', 'name slug')
+      .populate('genres', 'name slug');
 
     if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
 
@@ -134,8 +159,8 @@ export async function create(req, res, next) {
       genres: genreIds,
       tags,
       status: status === 'published' ? 'published' : 'draft',
-      createdBy: req.user._id,
-      updatedBy: req.user._id,
+      createdBy: req.staff._id,
+      updatedBy: req.staff._id,
       arrangements: [{
         label: label || 'Osnovna verzija',
         content,
@@ -143,7 +168,7 @@ export async function create(req, res, next) {
         capo: capo || 0,
         difficulty: difficulty || 'medium',
         isPrimary: true,
-        createdBy: req.user._id
+        createdBy: req.staff._id
       }]
     });
 
@@ -206,7 +231,7 @@ export async function update(req, res, next) {
       // Snapshot the previous text before overwriting, so an accidental
       // paste-over can be recovered.
       if (content && content !== target.content) {
-        song.history.push({ content: target.content, editedBy: req.user._id });
+        song.history.push({ content: target.content, editedBy: req.staff._id });
         target.content = content;
       }
       if (originalKey) target.originalKey = originalKey;
@@ -214,7 +239,7 @@ export async function update(req, res, next) {
       if (difficulty) target.difficulty = difficulty;
     }
 
-    song.updatedBy = req.user._id;
+    song.updatedBy = req.staff._id;
     await song.save();
     await song.populate('artist', 'name slug');
     await song.populate('genres', 'name slug');

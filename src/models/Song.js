@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { uniqueSlug } from '../utils/slug.js';
+import { uniqueSlug, slugify } from '../utils/slug.js';
 import { extractChords } from '../utils/chords.js';
 
 /**
@@ -35,6 +35,15 @@ const songSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 200 },
     slug: { type: String, required: true, unique: true, index: true },
+
+    /**
+     * De-accented lowercase title, searched instead of `title`.
+     *
+     * Readers type "noc" for "noć" and "zvijezda" the same either way; a plain
+     * regex on the display title finds neither. Storing a folded copy keeps
+     * matching diacritic-insensitive without a collation on every query.
+     */
+    searchTitle: { type: String, index: true },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true, index: true },
 
     arrangements: {
@@ -71,6 +80,10 @@ const MAX_HISTORY = 20;
 songSchema.pre('validate', async function (next) {
   if (!this.slug || this.isModified('title')) {
     this.slug = await uniqueSlug(this.constructor, this.title, this._id);
+  }
+
+  if (this.isModified('title') || !this.searchTitle) {
+    this.searchTitle = slugify(this.title).replace(/-/g, ' ');
   }
 
   // Exactly one primary. Fall back to the first if none was flagged.

@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import songRoutes from './routes/songs.js';
 import artistRoutes from './routes/artists.js';
 import genreRoutes from './routes/genres.js';
+import importRoutes from './routes/import.js';
 import meRoutes from './routes/me.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/artists', artistRoutes);
 app.use('/api/genres', genreRoutes);
+app.use('/api/import', importRoutes);
 app.use('/api/me', meRoutes);
 
 app.use(notFound);

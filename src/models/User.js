@@ -28,12 +28,6 @@ const userSchema = new mongoose.Schema(
       // Never ships in a query result unless explicitly selected.
       select: false
     },
-    role: {
-      type: String,
-      enum: ['user', 'worker', 'admin'],
-      default: 'user',
-      index: true
-    },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
     lastLoginAt: Date
   },
@@ -49,8 +43,7 @@ userSchema.methods.toPublic = function () {
   return {
     id: this._id,
     email: this.email,
-    username: this.username,
-    role: this.role
+    username: this.username
   };
 };
 

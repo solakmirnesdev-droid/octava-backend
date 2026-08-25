@@ -1,7 +1,16 @@
 import User from '../models/User.js';
-import { issueSession, clearSession } from '../utils/session.js';
+import Staff from '../models/Staff.js';
+import {
+  issueUserSession, issueStaffSession,
+  clearUserSession, clearStaffSession
+} from '../utils/session.js';
 
 const MIN_PASSWORD_LENGTH = 8;
+
+/** One message for both branches, so responses cannot enumerate accounts. */
+const INVALID = { message: 'Pogrešan email ili lozinka.' };
+
+// ---------------------------------------------------------------- readers ---
 
 export async function register(req, res, next) {
   try {
@@ -19,15 +28,15 @@ export async function register(req, res, next) {
       return res.status(409).json({ message: 'Nalog s ovom email adresom već postoji.' });
     }
 
+    // Public registration can only ever produce a reader. Editorial accounts
+    // live in a different collection and are created deliberately.
     const user = await User.create({
       email: normalized,
       username: username.trim(),
       passwordHash: await User.hashPassword(password)
-      // role intentionally omitted: self-registration always yields 'user'.
-      // Worker and admin roles are granted deliberately, never requested.
     });
 
-    res.status(201).json({ token: issueSession(res, user), user: user.toPublic() });
+    res.status(201).json({ token: issueUserSession(res, user), user: user.toPublic() });
   } catch (err) {
     next(err);
   }
@@ -41,56 +50,55 @@ export async function login(req, res, next) {
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
-
-    // One message for both branches, so the response cannot be used to
-    // enumerate which email addresses have accounts.
-    const invalid = { message: 'Pogrešan email ili lozinka.' };
-    if (!user) return res.status(401).json(invalid);
-    if (!(await user.verifyPassword(password))) return res.status(401).json(invalid);
+    if (!user || !(await user.verifyPassword(password))) return res.status(401).json(INVALID);
 
     user.lastLoginAt = new Date();
     await user.save();
 
-    res.json({ token: issueSession(res, user), user: user.toPublic() });
+    res.json({ token: issueUserSession(res, user), user: user.toPublic() });
   } catch (err) {
     next(err);
   }
 }
 
-/**
- * Login for the dashboard. Same credentials, but ordinary users are turned
- * away so an app account cannot reach the editing tools.
- */
-export async function loginStaff(req, res, next) {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email i lozinka su obavezni.' });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
-    const invalid = { message: 'Pogrešan email ili lozinka.' };
-
-    if (!user) return res.status(401).json(invalid);
-    if (!(await user.verifyPassword(password))) return res.status(401).json(invalid);
-    if (user.role === 'user') {
-      return res.status(403).json({ message: 'Ovaj nalog nema pristup uredničkom panelu.' });
-    }
-
-    user.lastLoginAt = new Date();
-    await user.save();
-
-    res.json({ token: issueSession(res, user), user: user.toPublic() });
-  } catch (err) {
-    next(err);
-  }
+export async function logout(_req, res) {
+  clearUserSession(res);
+  res.json({ ok: true });
 }
 
 export async function me(req, res) {
   res.json({ user: req.user.toPublic() });
 }
 
-export async function logout(_req, res) {
-  clearSession(res);
+// ---------------------------------------------------------------- editors ---
+
+export async function staffLogin(req, res, next) {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email i lozinka su obavezni.' });
+    }
+
+    // Looks only at Staff. An account created on the public site does not
+    // exist here at all, so there is nothing to reject in the first place.
+    const staff = await Staff.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
+    if (!staff || !(await staff.verifyPassword(password))) return res.status(401).json(INVALID);
+    if (!staff.active) return res.status(403).json({ message: 'Nalog je deaktiviran.' });
+
+    staff.lastLoginAt = new Date();
+    await staff.save();
+
+    res.json({ token: issueStaffSession(res, staff), user: staff.toPublic() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function staffLogout(_req, res) {
+  clearStaffSession(res);
   res.json({ ok: true });
+}
+
+export async function staffMe(req, res) {
+  res.json({ user: req.staff.toPublic() });
 }

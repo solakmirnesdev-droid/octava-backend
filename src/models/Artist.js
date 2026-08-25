@@ -1,10 +1,13 @@
 import mongoose from 'mongoose';
-import { uniqueSlug } from '../utils/slug.js';
+import { uniqueSlug, slugify } from '../utils/slug.js';
 
 const artistSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
     slug: { type: String, required: true, unique: true, index: true },
+
+    /** De-accented lowercase name; see Song.searchTitle for why. */
+    searchName: { type: String, index: true },
     bio: { type: String, maxlength: 2000 },
     imageUrl: String,
     genres: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Genre', index: true }],
@@ -16,6 +19,10 @@ const artistSchema = new mongoose.Schema(
 artistSchema.pre('validate', async function (next) {
   if (!this.slug || this.isModified('name')) {
     this.slug = await uniqueSlug(this.constructor, this.name, this._id);
+  }
+
+  if (this.isModified('name') || !this.searchName) {
+    this.searchName = slugify(this.name).replace(/-/g, ' ');
   }
   next();
 });

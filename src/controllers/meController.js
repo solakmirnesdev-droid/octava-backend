@@ -1,11 +1,21 @@
 import Song from '../models/Song.js';
+import { readPaging, pageMeta } from '../utils/pagination.js';
 
 export async function listFavorites(req, res, next) {
   try {
-    const songs = await Song.find({ _id: { $in: req.user.favorites }, status: 'published' })
-      .populate('artist', 'name slug');
+    const paging = readPaging(req.query);
+    const filter = { _id: { $in: req.user.favorites }, status: 'published' };
 
-    res.json({ songs: songs.map((s) => s.toPublic()) });
+    const [songs, total] = await Promise.all([
+      Song.find(filter)
+        .populate('artist', 'name slug')
+        .sort({ title: 1 })
+        .skip(paging.skip)
+        .limit(paging.limit),
+      Song.countDocuments(filter)
+    ]);
+
+    res.json({ songs: songs.map((s) => s.toPublic()), meta: pageMeta(total, paging) });
   } catch (err) {
     next(err);
   }

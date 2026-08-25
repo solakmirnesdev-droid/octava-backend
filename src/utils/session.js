@@ -1,21 +1,19 @@
-import { signToken } from './jwt.js';
+import { signToken, REALM_USER, REALM_STAFF } from './jwt.js';
 
-export const SESSION_COOKIE = 'octava_session';
+/**
+ * Separate cookie names per realm, so a browser signed into both the public
+ * site and the dashboard holds two independent sessions that cannot be
+ * mistaken for one another.
+ */
+export const USER_COOKIE = 'octava_session';
+export const STAFF_COOKIE = 'octava_staff';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Issues the session as an httpOnly cookie and also returns the raw token.
- *
- * The cookie is what the server-rendered app uses: it travels automatically and
- * cannot be read by injected JavaScript, unlike a token kept in localStorage.
- * The token in the body is for the dashboard SPA, which is on a different
- * origin and sends it as a Bearer header instead.
- */
-export function issueSession(res, user) {
-  const token = signToken(user);
+function issue(res, cookieName, subject, realm, extra) {
+  const token = signToken(subject, realm, extra);
 
-  res.cookie(SESSION_COOKIE, token, {
+  res.cookie(cookieName, token, {
     httpOnly: true,
     sameSite: 'lax',
     // Secure would make the cookie invisible over plain http in local dev.
@@ -27,6 +25,11 @@ export function issueSession(res, user) {
   return token;
 }
 
-export function clearSession(res) {
-  res.clearCookie(SESSION_COOKIE, { path: '/' });
-}
+export const issueUserSession = (res, user) =>
+  issue(res, USER_COOKIE, user._id, REALM_USER);
+
+export const issueStaffSession = (res, staff) =>
+  issue(res, STAFF_COOKIE, staff._id, REALM_STAFF, { role: staff.role });
+
+export const clearUserSession = (res) => res.clearCookie(USER_COOKIE, { path: '/' });
+export const clearStaffSession = (res) => res.clearCookie(STAFF_COOKIE, { path: '/' });

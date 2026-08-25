@@ -1,32 +1,30 @@
-import { verifyToken } from '../utils/jwt.js';
-import { SESSION_COOKIE } from '../utils/session.js';
+import { verifyToken, REALM_USER, REALM_STAFF } from '../utils/jwt.js';
+import { USER_COOKIE, STAFF_COOKIE } from '../utils/session.js';
 import User from '../models/User.js';
+import Staff from '../models/Staff.js';
 
 /**
  * Two clients, two transports: the server-rendered app sends an httpOnly
- * cookie, the dashboard SPA sends a Bearer header. Either is accepted.
+ * cookie, the dashboard SPA sends a Bearer header. Either is accepted, but the
+ * cookie read is realm-specific so the two sessions never cross.
  */
-function readToken(req) {
+function readToken(req, cookieName) {
   const [scheme, token] = (req.headers.authorization || '').split(' ');
   if (scheme === 'Bearer' && token) return token;
-  return req.cookies?.[SESSION_COOKIE] || null;
+  return req.cookies?.[cookieName] || null;
 }
 
 /**
- * Populates req.user from a Bearer token, or 401s.
- *
- * The user is re-read on every request rather than trusted from the token
- * payload, so a role change or deletion takes effect immediately instead of
- * waiting out the token's expiry.
+ * Both guards re-read the account on every request rather than trusting the
+ * token payload, so a deactivation or a role change takes effect immediately
+ * instead of waiting out the token's expiry.
  */
-export async function requireAuth(req, res, next) {
-  const token = readToken(req);
-  if (!token) {
-    return res.status(401).json({ message: 'Prijava je obavezna.' });
-  }
+export async function requireUser(req, res, next) {
+  const token = readToken(req, USER_COOKIE);
+  if (!token) return res.status(401).json({ message: 'Prijava je obavezna.' });
 
   try {
-    const payload = verifyToken(token);
+    const payload = verifyToken(token, REALM_USER);
     const user = await User.findById(payload.sub);
     if (!user) return res.status(401).json({ message: 'Nalog više ne postoji.' });
 
@@ -37,24 +35,56 @@ export async function requireAuth(req, res, next) {
   }
 }
 
-/** Gate a route to specific roles. Admin passes everything. */
+export async function requireStaff(req, res, next) {
+  const token = readToken(req, STAFF_COOKIE);
+  if (!token) return res.status(401).json({ message: 'Prijava je obavezna.' });
+
+  try {
+    const payload = verifyToken(token, REALM_STAFF);
+    const staff = await Staff.findById(payload.sub);
+
+    if (!staff) return res.status(401).json({ message: 'Nalog više ne postoji.' });
+    if (!staff.active) return res.status(403).json({ message: 'Nalog je deaktiviran.' });
+
+    req.staff = staff;
+    next();
+  } catch {
+    res.status(401).json({ message: 'Sesija je istekla. Prijavi se ponovo.' });
+  }
+}
+
+/** Gate a staff route to specific roles. Admin passes everything. */
 export function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: 'Prijava je obavezna.' });
-    if (req.user.role === 'admin' || roles.includes(req.user.role)) return next();
+    if (!req.staff) return res.status(401).json({ message: 'Prijava je obavezna.' });
+    if (req.staff.role === 'admin' || roles.includes(req.staff.role)) return next();
     return res.status(403).json({ message: 'Nemaš dozvolu za ovu radnju.' });
   };
 }
 
-/** Attaches req.user when a token is present, but never rejects. */
+/**
+ * Attaches whichever session is present without ever rejecting.
+ * Used on public routes that show more to editors, such as unpublished drafts.
+ */
 export async function optionalAuth(req, _res, next) {
-  const token = readToken(req);
-  if (token) {
+  const userToken = readToken(req, USER_COOKIE);
+  if (userToken) {
     try {
-      req.user = await User.findById(verifyToken(token).sub);
+      req.user = await User.findById(verifyToken(userToken, REALM_USER).sub);
     } catch {
       // An unreadable token on a public route is simply an anonymous visit.
     }
   }
+
+  const staffToken = req.cookies?.[STAFF_COOKIE] || readToken(req, STAFF_COOKIE);
+  if (staffToken) {
+    try {
+      const staff = await Staff.findById(verifyToken(staffToken, REALM_STAFF).sub);
+      if (staff?.active) req.staff = staff;
+    } catch {
+      // Same: no staff session simply means no drafts.
+    }
+  }
+
   next();
 }

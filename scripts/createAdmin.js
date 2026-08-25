@@ -1,5 +1,8 @@
 /**
- * Creates the first admin, or promotes an existing account.
+ * Creates the first editorial admin, or promotes an existing Staff account.
+ *
+ * Editorial accounts live in the Staff collection, separate from public site
+ * accounts. Creating one here can never touch a reader's account.
  *
  *   node scripts/createAdmin.js
  *
@@ -10,7 +13,7 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 import readline from 'node:readline/promises';
 import { connectDB } from '../src/config/db.js';
-import User from '../src/models/User.js';
+import Staff from '../src/models/Staff.js';
 
 const CTRL_C = String.fromCharCode(3);
 const CTRL_D = String.fromCharCode(4);
@@ -62,7 +65,7 @@ try {
   await connectDB();
 
   const email = (await rl.question('Email: ')).toLowerCase().trim();
-  const existing = await User.findOne({ email });
+  const existing = await Staff.findOne({ email });
 
   if (existing) {
     const confirm = await rl.question(
@@ -77,7 +80,7 @@ try {
     }
     rl.close();
   } else {
-    const username = (await rl.question('Username: ')).trim();
+    const username = (await rl.question('Ime: ')).trim();
     rl.close();
 
     const password = await askHidden('Password (min 8 chars, hidden): ');
@@ -86,11 +89,11 @@ try {
       process.exit(1);
     }
 
-    await User.create({
+    await Staff.create({
       email,
-      username,
+      name: username,
       role: 'admin',
-      passwordHash: await User.hashPassword(password)
+      passwordHash: await Staff.hashPassword(password)
     });
     console.log('Done. Admin created: ' + email);
   }

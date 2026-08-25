@@ -27,7 +27,7 @@ export async function getOne(req, res, next) {
     const paging = readPaging(req.query);
     const filter = {
       genres: genre._id,
-      ...(req.user && req.user.role !== 'user' ? {} : { status: 'published' })
+      ...(req.staff ? {} : { status: 'published' })
     };
 
     const sort = req.query.sort === 'popular'

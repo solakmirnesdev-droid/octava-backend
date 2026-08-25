@@ -19,7 +19,8 @@ export async function list(req, res, next) {
     }
 
     if (req.query.q) {
-      filter.name = new RegExp(escapeRegex(req.query.q.trim()), 'i');
+      const folded = slugify(req.query.q).replace(/-/g, ' ');
+      if (folded) filter.searchName = new RegExp(escapeRegex(folded), 'i');
     }
 
     // Alphabet navigation matches on the slug, so Č and C land together rather
@@ -56,18 +57,25 @@ export async function getOne(req, res, next) {
       .populate('genres', 'name slug');
     if (!artist) return res.status(404).json({ message: 'Izvođač nije pronađen.' });
 
+    const paging = readPaging(req.query);
     const filter = {
       artist: artist._id,
-      ...(req.user && req.user.role !== 'user' ? {} : { status: 'published' })
+      ...(req.staff ? {} : { status: 'published' })
     };
 
-    const songs = await Song.find(filter)
-      .populate('artist', 'name slug')
-      .populate('genres', 'name slug')
-      .sort({ title: 1 });
+    const [songs, total] = await Promise.all([
+      Song.find(filter)
+        .populate('artist', 'name slug')
+        .populate('genres', 'name slug')
+        .sort({ title: 1 })
+        .skip(paging.skip)
+        .limit(paging.limit),
+      Song.countDocuments(filter)
+    ]);
 
     res.json({
-      artist: { ...artist.toObject(), songs: songs.map((s) => s.toPublic()) }
+      artist: { ...artist.toObject(), songs: songs.map((s) => s.toPublic()) },
+      meta: pageMeta(total, paging)
     });
   } catch (err) {
     next(err);
