@@ -24,7 +24,13 @@ export async function listFavorites(req, res, next) {
 export async function addFavorite(req, res, next) {
   try {
     // $addToSet rather than push, so a double-tap cannot duplicate the entry.
-    await req.user.updateOne({ $addToSet: { favorites: req.params.songId } });
+    const result = await req.user.updateOne({ $addToSet: { favorites: req.params.songId } });
+
+    // Only move the counter when the set actually changed, or a double-tap
+    // would inflate it.
+    if (result.modifiedCount) {
+      await Song.updateOne({ _id: req.params.songId }, { $inc: { favoriteCount: 1 } });
+    }
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -33,7 +39,15 @@ export async function addFavorite(req, res, next) {
 
 export async function removeFavorite(req, res, next) {
   try {
-    await req.user.updateOne({ $pull: { favorites: req.params.songId } });
+    const result = await req.user.updateOne({ $pull: { favorites: req.params.songId } });
+
+    if (result.modifiedCount) {
+      // Guarded, so a stale request cannot drive the count below zero.
+      await Song.updateOne(
+        { _id: req.params.songId, favoriteCount: { $gt: 0 } },
+        { $inc: { favoriteCount: -1 } }
+      );
+    }
     res.json({ ok: true });
   } catch (err) {
     next(err);

@@ -57,7 +57,15 @@ const songSchema = new mongoose.Schema(
     youtubeId: String,
 
     status: { type: String, enum: ['draft', 'published'], default: 'draft', index: true },
-    views: { type: Number, default: 0 },
+    views: { type: Number, default: 0, index: true },
+
+    /**
+     * Kept on the song rather than counted from User.favorites on demand.
+     * Counting would mean scanning every user's array for every row of the
+     * dashboard; a counter maintained at the two points where a favourite is
+     * added or removed costs nothing to read.
+     */
+    favoriteCount: { type: Number, default: 0, index: true },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

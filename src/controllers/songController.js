@@ -40,6 +40,16 @@ export async function list(req, res, next) {
     const paging = readPaging(req.query);
     const filter = { ...visibilityFilter(req.staff) };
 
+    // Editors can ask for one state explicitly. Checked against the enum
+    // rather than passed through, so the query cannot be steered by the
+    // caller. Visitors are already limited to published by visibilityFilter,
+    // so a request for drafts narrows to nothing rather than leaking them.
+    if (req.query.status && ['published', 'draft'].includes(req.query.status)) {
+      filter.status = req.staff
+        ? req.query.status
+        : (req.query.status === 'published' ? 'published' : '__none__');
+    }
+
     if (req.query.genre) {
       const genre = await Genre.findOne({ slug: req.query.genre });
       if (!genre) return res.json({ songs: [], meta: pageMeta(0, paging) });
