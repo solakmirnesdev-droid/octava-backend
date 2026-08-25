@@ -27,7 +27,19 @@ const staffSchema = new mongoose.Schema(
 
     role: { type: String, enum: ['worker', 'admin'], default: 'worker', index: true },
     active: { type: Boolean, default: true },
-    lastLoginAt: Date
+    lastLoginAt: Date,
+
+    /**
+     * Second factor. The secret is as sensitive as the password hash — anyone
+     * holding it can generate valid codes forever — so it never leaves the
+     * database unless explicitly selected.
+     */
+    totpSecret: { type: String, select: false },
+    totpEnabled: { type: Boolean, default: false },
+    /** Highest counter already accepted, so a code cannot be replayed. */
+    totpLastCounter: { type: Number, select: false },
+    /** Hashed single-use recovery codes. */
+    backupCodes: { type: [String], select: false, default: [] }
   },
   // Pinned, because the default pluraliser would name this 'staffs'.
   { timestamps: true, collection: 'staff' }
@@ -38,7 +50,13 @@ staffSchema.methods.verifyPassword = function (plain) {
 };
 
 staffSchema.methods.toPublic = function () {
-  return { id: this._id, email: this.email, name: this.name, role: this.role };
+  return {
+    id: this._id,
+    email: this.email,
+    name: this.name,
+    role: this.role,
+    totpEnabled: this.totpEnabled
+  };
 };
 
 staffSchema.statics.hashPassword = (plain) => bcrypt.hash(plain, SALT_ROUNDS);

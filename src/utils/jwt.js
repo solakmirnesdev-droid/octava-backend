@@ -12,6 +12,16 @@ import jwt from 'jsonwebtoken';
 export const REALM_USER = 'user';
 export const REALM_STAFF = 'staff';
 
+/**
+ * The token handed out between password and second factor.
+ *
+ * A realm of its own, and short-lived, because it proves only that the
+ * password was correct. Reusing the staff realm here would make step one a
+ * complete login and the second factor decorative.
+ */
+export const REALM_STAFF_CHALLENGE = 'staff-2fa';
+export const CHALLENGE_TTL = '5m';
+
 function secret() {
   const value = process.env.JWT_SECRET;
   // Failing loudly beats signing every token with an empty string.
@@ -19,13 +29,17 @@ function secret() {
   return value;
 }
 
-export function signToken(subject, realm, extra = {}) {
+export function signToken(subject, realm, extra = {}, expiresIn = null) {
   return jwt.sign(
     { sub: subject.toString(), realm, ...extra },
     secret(),
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '7d' }
   );
 }
+
+/** Signs the short-lived token that carries a login between its two steps. */
+export const signChallenge = (subject) =>
+  signToken(subject, REALM_STAFF_CHALLENGE, {}, CHALLENGE_TTL);
 
 /** Verifies signature, expiry and realm. A mismatched realm is a rejection. */
 export function verifyToken(token, expectedRealm) {

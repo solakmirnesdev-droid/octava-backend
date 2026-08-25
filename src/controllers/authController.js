@@ -4,6 +4,8 @@ import {
   issueUserSession, issueStaffSession,
   clearUserSession, clearStaffSession
 } from '../utils/session.js';
+import { signChallenge, verifyToken, REALM_STAFF_CHALLENGE } from '../utils/jwt.js';
+import { verifyCode, consumeBackupCode } from '../utils/totp.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -85,6 +87,15 @@ export async function staffLogin(req, res, next) {
     if (!staff || !(await staff.verifyPassword(password))) return res.status(401).json(INVALID);
     if (!staff.active) return res.status(403).json({ message: 'Nalog je deaktiviran.' });
 
+    // With a second factor set, the password alone buys nothing but a
+    // five-minute ticket to the next step. No session is issued here.
+    if (staff.totpEnabled) {
+      return res.json({
+        twoFactorRequired: true,
+        challenge: signChallenge(staff._id)
+      });
+    }
+
     staff.lastLoginAt = new Date();
     await staff.save();
 
@@ -101,4 +112,58 @@ export async function staffLogout(_req, res) {
 
 export async function staffMe(req, res) {
   res.json({ user: req.staff.toPublic() });
+}
+
+/**
+ * Second step of the editorial login.
+ *
+ * Accepts either a current authenticator code or one of the single-use backup
+ * codes. A used counter is recorded so an observed code cannot be replayed
+ * inside its own thirty-second window.
+ */
+export async function staffLoginVerify(req, res, next) {
+  try {
+    const { challenge, code } = req.body;
+    if (!challenge || !code) {
+      return res.status(400).json({ message: 'Kod je obavezan.' });
+    }
+
+    let payload;
+    try {
+      payload = verifyToken(challenge, REALM_STAFF_CHALLENGE);
+    } catch {
+      return res.status(401).json({ message: 'Prijava je istekla. Pokušaj ponovo.' });
+    }
+
+    const staff = await Staff.findById(payload.sub)
+      .select('+totpSecret +totpLastCounter +backupCodes');
+
+    if (!staff || !staff.active || !staff.totpEnabled) {
+      return res.status(401).json(INVALID);
+    }
+
+    const counter = verifyCode(staff.totpSecret, staff.email, code, staff.totpLastCounter);
+
+    if (counter !== null) {
+      staff.totpLastCounter = counter;
+    } else {
+      // Not a valid code; it may still be a recovery code.
+      const remaining = await consumeBackupCode(code, staff.backupCodes);
+      if (!remaining) {
+        return res.status(400).json({ message: 'Pogrešan kod.' });
+      }
+      staff.backupCodes = remaining;
+    }
+
+    staff.lastLoginAt = new Date();
+    await staff.save();
+
+    res.json({
+      token: issueStaffSession(res, staff),
+      user: staff.toPublic(),
+      backupCodesRemaining: staff.backupCodes.length
+    });
+  } catch (err) {
+    next(err);
+  }
 }

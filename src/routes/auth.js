@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import {
   register, login, logout, me,
-  staffLogin, staffLogout, staffMe
+  staffLogin, staffLoginVerify, staffLogout, staffMe
 } from '../controllers/authController.js';
+import {
+  setup, enable, disable, regenerateBackupCodes
+} from '../controllers/twoFactorController.js';
 import { requireUser, requireStaff } from '../middleware/auth.js';
-import { loginLimiter, registerLimiter, authLimiter } from '../middleware/rateLimit.js';
+import { loginLimiter, registerLimiter, authLimiter, twoFactorLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -18,7 +21,16 @@ router.get('/me', requireUser, me);
 
 // Editors. Separate collection, separate cookie, separate token realm.
 router.post('/staff/login', loginLimiter, staffLogin);
+// Throttled too: this endpoint guards a six-digit secret, which is well
+// within reach of a brute force if attempts are unlimited.
+router.post('/staff/login/verify', twoFactorLimiter, staffLoginVerify);
 router.post('/staff/logout', staffLogout);
 router.get('/staff/me', requireStaff, staffMe);
+
+// Second factor management, all behind an existing session.
+router.post('/staff/2fa/setup', requireStaff, setup);
+router.post('/staff/2fa/enable', requireStaff, enable);
+router.post('/staff/2fa/disable', requireStaff, disable);
+router.post('/staff/2fa/backup-codes', requireStaff, regenerateBackupCodes);
 
 export default router;
