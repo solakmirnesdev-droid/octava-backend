@@ -25,7 +25,21 @@ const staffSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, minlength: 2, maxlength: 60 },
     passwordHash: { type: String, required: true, select: false },
 
-    role: { type: String, enum: ['worker', 'admin'], default: 'worker', index: true },
+    /**
+     * Ranked, not a set of flags. Each level does everything the one below it
+     * does, so a route asks for a minimum rather than listing every role that
+     * should pass — which is how a new level ends up silently excluded.
+     *
+     *   worker      enters and edits songs
+     *   admin       the above, plus deleting songs and handling requests
+     *   superadmin  the above, plus the accounts of everyone else
+     */
+    role: {
+      type: String,
+      enum: ['worker', 'admin', 'superadmin'],
+      default: 'worker',
+      index: true
+    },
     active: { type: Boolean, default: true },
     /**
      * Password reset. Only the hash of the token is kept, so a database leak

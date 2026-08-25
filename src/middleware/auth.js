@@ -71,11 +71,23 @@ export async function requireStaff(req, res, next) {
   }
 }
 
-/** Gate a staff route to specific roles. Admin passes everything. */
-export function requireRole(...roles) {
+/**
+ * Ranks, high number wins. Comparing positions means a route states the lowest
+ * level it will accept, instead of enumerating roles — an enumeration silently
+ * locks out any level added later, including the one above the ones listed.
+ */
+export const ROLE_RANK = { worker: 1, admin: 2, superadmin: 3 };
+
+/** Gates a staff route to a minimum rank. */
+export function requireRole(minimum) {
+  const required = ROLE_RANK[minimum];
+
   return (req, res, next) => {
     if (!req.staff) return res.status(401).json({ message: 'Prijava je obavezna.' });
-    if (req.staff.role === 'admin' || roles.includes(req.staff.role)) return next();
+
+    const held = ROLE_RANK[req.staff.role] || 0;
+    if (held >= required) return next();
+
     return res.status(403).json({ message: 'Nemaš dozvolu za ovu radnju.' });
   };
 }

@@ -11,6 +11,7 @@ import importRoutes from './routes/import.js';
 import requestRoutes from './routes/requests.js';
 import footerRoutes from './routes/footer.js';
 import statsRoutes from './routes/stats.js';
+import accountRoutes from './routes/accounts.js';
 import meRoutes from './routes/me.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
@@ -62,6 +63,7 @@ app.use('/api/import', importRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/footer', footerRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/accounts', accountRoutes);
 app.use('/api/me', meRoutes);
 
 app.use(notFound);

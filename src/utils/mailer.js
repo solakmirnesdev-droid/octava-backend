@@ -10,9 +10,20 @@
  * Delivery goes over the provider's HTTP API rather than SMTP, which keeps this
  * to fetch and no dependency.
  */
-const PROVIDER = process.env.MAIL_PROVIDER || 'console';
-const API_KEY = process.env.MAIL_API_KEY || '';
-const FROM = process.env.MAIL_FROM || 'Octava <onboarding@resend.dev>';
+/**
+ * Configuration is read when a message is sent, not when this module loads.
+ *
+ * ES module imports are hoisted above the statements around them, so
+ * server.js loads the whole application graph before dotenv.config() runs.
+ * Reading process.env at load time froze this on 'console' regardless of what
+ * the environment actually said — the flow reported success and delivered
+ * nothing, which is the worst way for a mailer to fail.
+ */
+const config = () => ({
+  provider: process.env.MAIL_PROVIDER || 'console',
+  apiKey: process.env.MAIL_API_KEY || '',
+  from: process.env.MAIL_FROM || 'Octava <onboarding@resend.dev>'
+});
 
 const TRANSPORTS = {
   /** Prints the message. The link is on its own line so it can be clicked. */
@@ -28,13 +39,15 @@ const TRANSPORTS = {
   },
 
   resend: async ({ to, subject, text, html }) => {
+    const { apiKey, from } = config();
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ from: FROM, to: [to], subject, text, html })
+      body: JSON.stringify({ from, to: [to], subject, text, html })
     });
 
     if (!res.ok) {
@@ -46,16 +59,22 @@ const TRANSPORTS = {
 };
 
 export async function sendMail(message) {
-  const transport = TRANSPORTS[PROVIDER] || TRANSPORTS.console;
+  const { provider, apiKey } = config();
+  const transport = TRANSPORTS[provider] || TRANSPORTS.console;
 
   // A provider named but not configured would fail on every send; fall back
   // loudly rather than losing mail silently.
-  if (PROVIDER !== 'console' && !API_KEY) {
-    console.warn(`MAIL_PROVIDER=${PROVIDER} bez MAIL_API_KEY — vracam se na konzolu.`);
+  if (provider !== 'console' && !apiKey) {
+    console.warn(`MAIL_PROVIDER=${provider} bez MAIL_API_KEY — vracam se na konzolu.`);
     return TRANSPORTS.console(message);
   }
 
-  return transport(message);
+  const result = await transport(message);
+  if (result.delivered) console.log(`Email poslan (${result.transport}) na ${message.to}`);
+  return result;
 }
 
-export const mailerMode = () => (PROVIDER === 'console' || !API_KEY ? 'console' : PROVIDER);
+export function mailerMode() {
+  const { provider, apiKey } = config();
+  return provider === 'console' || !apiKey ? 'console' : provider;
+}
