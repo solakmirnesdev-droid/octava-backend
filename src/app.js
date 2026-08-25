@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -28,7 +29,31 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: '256kb' }));
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+/**
+ * Health, checked rather than assumed.
+ *
+ * Returning ok unconditionally means a database outage stays invisible: the
+ * load balancer keeps routing traffic to a process that fails every request.
+ * A ping is cheap and is the difference between a failover and a silent outage.
+ */
+app.get('/api/health', async (_req, res) => {
+  const state = mongoose.connection.readyState;
+
+  if (state !== 1) {
+    return res.status(503).json({ status: 'degraded', database: 'disconnected' });
+  }
+
+  try {
+    const started = Date.now();
+    await mongoose.connection.db.admin().command({ ping: 1 });
+    res.json({ status: 'ok', database: 'connected', latencyMs: Date.now() - started });
+  } catch (err) {
+    res.status(503).json({ status: 'degraded', database: 'unreachable' });
+  }
+});
+
+/** Liveness: is the process up at all, regardless of its dependencies. */
+app.get('/api/health/live', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/artists', artistRoutes);
