@@ -7,10 +7,16 @@ import songRoutes from './routes/songs.js';
 import artistRoutes from './routes/artists.js';
 import genreRoutes from './routes/genres.js';
 import importRoutes from './routes/import.js';
+import requestRoutes from './routes/requests.js';
 import meRoutes from './routes/me.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 const app = express();
+
+// Behind a proxy the client address arrives in a header; without this every
+// request looks like it comes from the proxy and rate limiting counts them
+// all together.
+app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
@@ -26,6 +32,7 @@ app.use('/api/songs', songRoutes);
 app.use('/api/artists', artistRoutes);
 app.use('/api/genres', genreRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/requests', requestRoutes);
 app.use('/api/me', meRoutes);
 
 app.use(notFound);
