@@ -1,20 +1,49 @@
 import { Router } from 'express';
-import { list, search, getOne, create, update, remove } from '../controllers/songController.js';
+import { list, search, getOne, create, update, remove, related } from '../controllers/songController.js';
 import { rate, unrate, getRating } from '../controllers/ratingController.js';
+import { listReviews, createReview } from '../controllers/reviewController.js';
+import { create as createReport } from '../controllers/reportController.js';
+import {
+  add as addArrangement, update as updateArrangement,
+  setPrimary as setPrimaryArrangement, remove as removeArrangement
+} from '../controllers/arrangementController.js';
+import { contentLimiter } from '../middleware/rateLimit.js';
+import { validate } from '../middleware/validate.js';
+import { songListQuery, songSearchQuery, songDetailQuery, identifierParam } from '../middleware/schemas.js';
 import { requireStaff, requireRole, optionalAuth, requireUser } from '../middleware/auth.js';
 
 const router = Router();
 
 // optionalAuth so editors see drafts while visitors see only published songs.
-router.get('/', optionalAuth, list);
-router.get('/search', optionalAuth, search);
-router.get('/:identifier', optionalAuth, getOne);
+router.get('/', validate({ query: songListQuery }), optionalAuth, list);
+router.get('/search', validate({ query: songSearchQuery }), optionalAuth, search);
+// Before the generic :identifier handler would not matter here — this path is
+// more specific — but it reads with the other song-scoped routes.
+router.get('/:identifier/related', related);
+
+router.get('/:identifier', validate({ params: identifierParam, query: songDetailQuery }), optionalAuth, getOne);
 
 // Reading the average is public; casting a vote needs an account, or the
 // number means nothing.
 router.get('/:identifier/rating', optionalAuth, getRating);
 router.post('/:identifier/rating', requireUser, rate);
 router.delete('/:identifier/rating', requireUser, unrate);
+
+// Reviews. Reading is public — they are part of what a visitor came to read —
+// and writing is throttled per account, not per address, so one café does not
+// share a quota.
+router.get('/:identifier/reviews', optionalAuth, listReviews);
+router.post('/:identifier/reviews', requireUser, contentLimiter, createReview);
+
+// Reporting a broken chart needs an account: an anonymous report is one the
+// desk cannot ask a follow-up question about.
+router.post('/:identifier/report', requireUser, contentLimiter, createReport);
+
+// Versions of a song. Editing chords is a worker's job, same as adding a song.
+router.post('/:identifier/arrangements', requireStaff, requireRole('worker'), addArrangement);
+router.put('/:identifier/arrangements/:arrangementId', requireStaff, requireRole('worker'), updateArrangement);
+router.patch('/:identifier/arrangements/:arrangementId/primary', requireStaff, requireRole('worker'), setPrimaryArrangement);
+router.delete('/:identifier/arrangements/:arrangementId', requireStaff, requireRole('worker'), removeArrangement);
 
 router.post('/', requireStaff, requireRole('worker'), create);
 router.put('/:identifier', requireStaff, requireRole('worker'), update);

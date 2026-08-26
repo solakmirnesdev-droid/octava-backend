@@ -1,4 +1,5 @@
 import SongRequest from '../models/SongRequest.js';
+import Notification from '../models/Notification.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 
 export async function list(req, res, next) {
@@ -53,6 +54,13 @@ export async function create(req, res, next) {
         existing.votes += 1;
         await existing.save();
       }
+
+      await Notification.raise({
+        type: 'request.voted',
+        request: existing._id,
+        actor: req.user?._id || null,
+        summary: `${existing.artist} — ${existing.title} (${existing.votes} glasova)`
+      });
       return res.status(200).json({
         request: shape(existing, req.user),
         alreadyRequested: true
@@ -65,6 +73,13 @@ export async function create(req, res, next) {
       note: note?.trim(),
       requestedBy: req.user?._id,
       voters: req.user ? [req.user._id] : []
+    });
+
+    await Notification.raise({
+      type: 'request.created',
+      request: request._id,
+      actor: req.user?._id || null,
+      summary: `${request.artist} — ${request.title}${request.note ? ': ' + request.note.slice(0, 80) : ''}`
     });
 
     res.status(201).json({ request: shape(request, req.user), alreadyRequested: false });
@@ -87,6 +102,17 @@ export async function vote(req, res, next) {
       request.votes += 1;
     }
     await request.save();
+
+    // Only a vote cast, never one withdrawn: the desk reads this as demand,
+    // and somebody changing their mind is not demand.
+    if (!already) {
+      await Notification.raise({
+        type: 'request.voted',
+        request: request._id,
+        actor: req.user._id,
+        summary: `${request.artist} — ${request.title} (${request.votes} glasova)`
+      });
+    }
 
     res.json({ request: shape(request, req.user) });
   } catch (err) {

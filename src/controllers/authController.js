@@ -6,6 +6,7 @@ import {
 } from '../utils/session.js';
 import { signChallenge, verifyToken, REALM_STAFF_CHALLENGE } from '../utils/jwt.js';
 import { verifyCode, consumeBackupCode } from '../utils/totp.js';
+import Notification from '../models/Notification.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -37,6 +38,17 @@ export async function register(req, res, next) {
       username: username.trim(),
       passwordHash: await User.hashPassword(password)
     });
+
+    await Notification.raise({
+
+      type: 'user.registered',
+
+      actor: user._id,
+
+      summary: `${user.username} (${user.email})`
+
+    });
+
 
     res.status(201).json({ token: issueUserSession(res, user), user: user.toPublic() });
   } catch (err) {

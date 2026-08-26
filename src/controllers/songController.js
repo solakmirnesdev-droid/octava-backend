@@ -97,7 +97,11 @@ export async function search(req, res, next) {
     // Only the songs are paged; the other two are navigation hints and stay
     // short whatever page the reader is on.
     const [artists, genres] = await Promise.all([
-      Artist.find({ searchName: pattern }).select('name slug songCount').limit(10),
+      // country and imageBytes are what toCard turns into the flag and the
+      // hasImage flag; selecting only name/slug/songCount silently produced
+      // results with neither.
+      Artist.find({ searchName: pattern })
+        .select('name slug songCount country imageBytes').limit(10),
       Genre.find({ name: new RegExp(escapeRegex(q), 'i') }).select('name slug').limit(10)
     ]);
 
@@ -121,7 +125,9 @@ export async function search(req, res, next) {
 
     res.json({
       songs: songs.map((s) => s.toPublic()),
-      artists,
+      // toCard turns country into a flag and imageBytes into a plain boolean;
+      // the raw documents carried neither.
+      artists: artists.map((a) => a.toCard()),
       genres,
       meta: pageMeta(total, paging)
     });
@@ -273,4 +279,65 @@ export async function remove(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * What else to play after this one.
+ *
+ * Ordered by how close the connection is: the same artist first, then the same
+ * genre, then whatever is popular. "Same artist" is the only one a guitarist
+ * would call obviously related, so it leads; the fallbacks exist so the section
+ * is never empty, which on a song with one genre and a one-song artist it
+ * otherwise would be.
+ *
+ * Views break ties throughout — among equally related songs, the one other
+ * people actually opened is the better suggestion.
+ */
+export async function related(req, res, next) {
+  try {
+    const song = await Song.findOne({ ...byIdOrSlug(req.params.identifier), status: 'published' })
+      .select('_id artist genres');
+    if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
+
+    const limit = Math.min(Number(req.query.limit) || 6, 12);
+    const base = { status: 'published', _id: { $ne: song._id } };
+    const fields = 'title slug views';
+    const populate = { path: 'artist', select: 'name slug' };
+
+    const picked = [];
+    const seen = new Set([String(song._id)]);
+
+    /** Adds only what is not already in the list, up to the limit. */
+    const take = (rows) => {
+      for (const row of rows) {
+        if (picked.length >= limit) return;
+        if (seen.has(String(row._id))) continue;
+        seen.add(String(row._id));
+        picked.push(row);
+      }
+    };
+
+    const sameArtist = await Song.find({ ...base, artist: song.artist })
+      .select(fields).populate(populate).sort({ views: -1 }).limit(limit);
+    take(sameArtist);
+
+    if (picked.length < limit && song.genres?.length) {
+      const sameGenre = await Song.find({ ...base, genres: { $in: song.genres } })
+        .select(fields).populate(populate).sort({ views: -1 }).limit(limit * 2);
+      take(sameGenre);
+    }
+
+    if (picked.length < limit) {
+      const popular = await Song.find(base)
+        .select(fields).populate(populate).sort({ views: -1 }).limit(limit * 2);
+      take(popular);
+    }
+
+    res.json({
+      items: picked.map((s) => ({
+        _id: s._id, title: s.title, slug: s.slug, views: s.views,
+        artist: s.artist ? { name: s.artist.name, slug: s.artist.slug } : null
+      }))
+    });
+  } catch (err) { next(err); }
 }

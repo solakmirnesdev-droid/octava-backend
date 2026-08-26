@@ -9,19 +9,26 @@ import {
 import { forgot, reset } from '../controllers/resetController.js';
 import { requireUser, requireStaff } from '../middleware/auth.js';
 import { loginLimiter, registerLimiter, authLimiter, twoFactorLimiter } from '../middleware/rateLimit.js';
+import { verifyTurnstile } from '../middleware/turnstile.js';
+import { login as googleLogin, status as googleStatus } from '../controllers/googleController.js';
 
 const router = Router();
 
 router.use(authLimiter);
 
 // Readers.
-router.post('/register', registerLimiter, register);
+router.post('/register', registerLimiter, verifyTurnstile, register);
 router.post('/login', loginLimiter, login);
 router.post('/logout', logout);
 
+// Whether to render the button, and the id the widget needs. Public: it is in
+// the page source either way.
+router.get('/google/status', googleStatus);
+router.post('/google', loginLimiter, googleLogin);
+
 // Throttled: this endpoint sends mail, so unlimited requests are both a way to
 // spam an address and a way to burn a sending quota.
-router.post('/forgot', registerLimiter, forgot);
+router.post('/forgot', registerLimiter, verifyTurnstile, forgot);
 router.post('/reset', loginLimiter, reset);
 router.get('/me', requireUser, me);
 

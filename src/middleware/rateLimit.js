@@ -91,3 +91,39 @@ export const twoFactorLimiter = limiter({
     return `2fa:${ipKeyGenerator(req.ip)}:${subject}`;
   }
 });
+
+/**
+ * Reader-authored content: reviews and replies.
+ *
+ * Keyed on the account rather than the address, because this is the one thing
+ * on the site where the abuse worth stopping comes from someone signed in. An
+ * address key would also throttle a whole household or café to one review.
+ *
+ * The window is generous on purpose — someone writing thoughtfully about six
+ * songs in an evening is the behaviour we want, not the behaviour we guard
+ * against. What it stops is a script posting hundreds.
+ */
+export const contentLimiter = limiter({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message,
+  keyGenerator: (req) => (req.user ? `user:${req.user._id}` : ipKeyGenerator(req.ip))
+});
+
+/**
+ * Everything a signed-out visitor can reach.
+ *
+ * Search runs a regex against the catalogue, so it is the cheapest request to
+ * make and one of the more expensive to serve. This is a ceiling on volume, set
+ * far above what reading the site looks like.
+ */
+export const publicLimiter = limiter({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message,
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
+});

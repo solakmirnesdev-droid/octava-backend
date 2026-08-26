@@ -13,7 +13,27 @@ import footerRoutes from './routes/footer.js';
 import statsRoutes from './routes/stats.js';
 import accountRoutes from './routes/accounts.js';
 import meRoutes from './routes/me.js';
+import reviewRoutes from './routes/reviews.js';
+import commentRoutes from './routes/comments.js';
+import moderationRoutes from './routes/moderation.js';
+import notificationRoutes from './routes/notifications.js';
+import reportRoutes from './routes/reports.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { publicLimiter } from './middleware/rateLimit.js';
+
+/**
+ * Both are optional, and both fail open when unset — which is right for local
+ * work and wrong in production. Saying so once at startup is the only thing
+ * standing between "not configured yet" and "quietly unprotected for months".
+ */
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.TURNSTILE_SECRET_KEY) {
+    console.warn('[startup] TURNSTILE_SECRET_KEY is not set — CAPTCHA is disabled.');
+  }
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    console.warn('[startup] GOOGLE_CLIENT_ID is not set — Google sign-in is unavailable.');
+  }
+}
 
 const app = express();
 
@@ -55,6 +75,17 @@ app.get('/api/health', async (_req, res) => {
 
 /** Liveness: is the process up at all, regardless of its dependencies. */
 app.get('/api/health/live', (_req, res) => res.json({ status: 'ok' }));
+/**
+ * A ceiling on volume for everything a signed-out visitor can reach. Search
+ * runs a regex over the catalogue, which makes it the cheapest request to send
+ * and one of the more expensive to answer.
+ */
+app.use('/api/songs', publicLimiter);
+app.use('/api/artists', publicLimiter);
+app.use('/api/genres', publicLimiter);
+app.use('/api/footer', publicLimiter);
+app.use('/api/stats', publicLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/artists', artistRoutes);
@@ -65,6 +96,11 @@ app.use('/api/footer', footerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/me', meRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/moderation', moderationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

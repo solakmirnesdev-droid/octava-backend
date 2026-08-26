@@ -1,30 +1,20 @@
-import dotenv from 'dotenv';
-dotenv.config();
+/**
+ * First, and deliberately on its own line before every other import.
+ *
+ * ESM evaluates imports in order and all of them before this file's body, so
+ * the previous `dotenv.config()` in the body ran only after the whole app graph
+ * had been imported. Loading the environment as the first import is what makes
+ * it available to everything that follows.
+ */
+import { env } from './src/config/env.js';
 
 import mongoose from 'mongoose';
 import app from './src/app.js';
 import { connectDB } from './src/config/db.js';
 
-const PORT = process.env.PORT || 4000;
+const PORT = env.PORT;
 
-/**
- * Fail at startup, not at first use.
- *
- * A missing JWT_SECRET used to surface only when someone tried to sign in,
- * which means a broken deploy looks healthy until the first login attempt.
- */
-const REQUIRED = ['MONGODB_URI', 'JWT_SECRET'];
-const missing = REQUIRED.filter((key) => !process.env[key]);
-
-if (missing.length) {
-  console.error('Missing required environment variables: ' + missing.join(', '));
-  process.exit(1);
-}
-
-if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) {
-  console.error('JWT_SECRET is too short for production. Use at least 32 characters.');
-  process.exit(1);
-}
+console.log(`✓ Okruženje: ${env.NODE_ENV}${env.envFile ? ` (${env.envFile})` : ' (bez .env fajla)'}`);
 
 let server;
 
@@ -32,7 +22,7 @@ try {
   // Connect before listening, so the first request never races the database.
   await connectDB();
   server = app.listen(PORT, () => {
-    console.log(`✓ Octava backend running on http://localhost:${PORT}`);
+    console.log(`✓ Octava backend na http://localhost:${PORT}`);
   });
 } catch (err) {
   console.error('Failed to start:', err.message);
