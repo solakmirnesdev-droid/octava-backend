@@ -4,6 +4,7 @@ import Artist from '../models/Artist.js';
 import Genre from '../models/Genre.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
+import { youtubeId } from '../utils/youtube.js';
 
 /** Escapes user input before it is used inside a RegExp. */
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -158,7 +159,7 @@ export async function getOne(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, label } = req.body;
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, label, youtube } = req.body;
 
     if (!title || !artist || !content || !originalKey) {
       return res.status(400).json({ message: 'Naslov, izvođač, tekst i tonalitet su obavezni.' });
@@ -175,6 +176,8 @@ export async function create(req, res, next) {
       genres: genreIds,
       tags,
       status: status === 'published' ? 'published' : 'draft',
+      // Rejected input leaves the field unset rather than storing junk.
+      youtubeId: youtubeId(youtube) || undefined,
       createdBy: req.staff._id,
       updatedBy: req.staff._id,
       arrangements: [{
@@ -208,7 +211,7 @@ export async function update(req, res, next) {
     const song = await Song.findOne(byIdOrSlug(req.params.identifier));
     if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
 
-    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, arrangementId } = req.body;
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, arrangementId, youtube } = req.body;
 
     if (title) song.title = title;
     if (tags) song.tags = tags;
@@ -232,6 +235,20 @@ export async function update(req, res, next) {
       await Artist.updateOne({ _id: song.artist }, { $addToSet: { genres: { $each: next } } });
     }
     if (status) song.status = status === 'published' ? 'published' : 'draft';
+    /**
+     * undefined leaves it alone; an empty string clears it.
+     *
+     * The distinction matters: a form that always sends the field would wipe
+     * the video on every unrelated save if absence and emptiness were treated
+     * the same.
+     */
+    if (youtube !== undefined) {
+      const id = youtubeId(youtube);
+      if (id === null) {
+        return res.status(400).json({ message: 'Neispravan YouTube link.' });
+      }
+      song.youtubeId = id || undefined;
+    }
 
     if (artist) {
       const artistDoc = await Artist.findOrCreateByName(artist);
