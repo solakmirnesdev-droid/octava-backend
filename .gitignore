@@ -1,6 +1,11 @@
 node_modules/
 .env
 .env.local
+# Every variant, including .env.dev and .env.prod, which carry real secrets.
+.env.*
+# Templates are safe to commit; they hold names, not values.
+!.env.example
+!.env.prod.example
 .DS_Store
 *.log
 dist/
