@@ -42,7 +42,12 @@ export async function list(req, res, next) {
     ]);
 
     res.json({
-      artists,
+      /**
+       * toCard rather than the raw documents: it adds the flag and a plain
+       * hasImage flag, and it stops searchName, imageBytes and __v from
+       * travelling to every client that lists artists.
+       */
+      artists: artists.map((a) => ({ ...a.toCard(), genres: a.genres, bio: a.bio })),
       letters: letters.map((l) => l._id).filter((l) => /^[A-Z]$/.test(l)),
       meta: pageMeta(total, paging)
     });
@@ -74,7 +79,12 @@ export async function getOne(req, res, next) {
     ]);
 
     res.json({
-      artist: { ...artist.toObject(), songs: songs.map((s) => s.toPublic()) },
+      artist: {
+        ...artist.toCard(),
+        bio: artist.bio,
+        genres: artist.genres,
+        songs: songs.map((s) => s.toPublic())
+      },
       meta: pageMeta(total, paging)
     });
   } catch (err) {
