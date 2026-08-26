@@ -1,0 +1,471 @@
+[
+  {
+    "name": "2CELLOS",
+    "mbid": "c8e94c78-0e17-4d9a-b1f6-96e1b22ebe97",
+    "country": "HR",
+    "type": "Group",
+    "note": "Croatian cellist duo",
+    "tags": [
+      "classical",
+      "classical crossover",
+      "instrumental",
+      "instrumental rock",
+      "modern classical"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "dreDDup",
+    "mbid": "1dadddb7-f1a9-49b2-a647-f0f7d7927ce1",
+    "country": "RS",
+    "type": "Group",
+    "note": "industrial rock",
+    "tags": [
+      "big beat",
+      "industrial rock",
+      "big beat",
+      "demonic electronic",
+      "dreddup"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Vlatko Stefanovski",
+    "mbid": "e9d87fc2-2961-4e12-a56e-67fe1f8be2b9",
+    "country": "MK",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "jazz fusion",
+      "progressive folk",
+      "jazz fusion",
+      "progressive folk"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "84Bit",
+    "mbid": "f1e38c08-8738-46d3-9695-abaaed4920f4",
+    "country": "ME",
+    "type": "Group",
+    "note": "DJ/producer duo",
+    "tags": [
+      "house",
+      "house"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Aleksander Mežek",
+    "mbid": "a85bbe3a-07c7-41fb-a52c-0f531ad4dbe7",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "composer"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Bogalj",
+    "mbid": "6003dacb-6d4d-4426-9184-c057efe6e2d9",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegrin Thrash/Black/Death Metal",
+    "tags": [
+      "black metal",
+      "death metal",
+      "thrash metal",
+      "black metal",
+      "death metal"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Damjan Mravunac",
+    "mbid": "21d2c7d9-1637-4be1-b84a-f6edf84f48e0",
+    "country": "HR",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "vgm",
+      "video game music"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Edin Karamazov",
+    "mbid": "a472827c-096d-423a-998c-65e9b6440e14",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "bosnian",
+      "lute",
+      "lutist"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Egorythmia",
+    "mbid": "71465f45-6f45-4a73-aaf0-a79d736c6222",
+    "country": "MK",
+    "type": "Person",
+    "note": "Macedonian progressive/psytrance project of Boban Lazovski",
+    "tags": [
+      "electronic",
+      "psychedelic",
+      "psytrance",
+      "trance",
+      "electronic"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Iguman",
+    "mbid": "bdb5d928-6db7-44f1-af33-7b948c0026f0",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegrin Black Metal",
+    "tags": [
+      "black metal",
+      "black metal"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Laibach",
+    "mbid": "c779e090-909f-4403-a90e-c1d08cdbb719",
+    "country": "SI",
+    "type": "Group",
+    "note": "",
+    "tags": [
+      "avant-garde",
+      "experimental",
+      "industrial",
+      "martial industrial",
+      "post-industrial"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Marga Sol",
+    "mbid": "b33f280b-1381-4abd-868e-7e91b80c42f2",
+    "country": "MK",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "balearic beat",
+      "chillout",
+      "downtempo",
+      "balearic beat",
+      "chillout"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Morana",
+    "mbid": "d9deb39b-2f89-48da-86c2-3dc7b579d246",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegro Pagan Black Metal band",
+    "tags": [
+      "crust punk",
+      "pagan black metal",
+      "crust punk",
+      "pagan black metal"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Saša Stanišić",
+    "mbid": "8a95e097-e926-44d2-a77f-e50397ccc115",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "has german audiobooks"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Slavko Avsenik und seine Original Oberkrainer",
+    "mbid": "f17746cb-aa9e-4c1f-a048-860a33866bd7",
+    "country": "SI",
+    "type": "Group",
+    "note": "",
+    "tags": [
+      "oberkrainer"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Solomun",
+    "mbid": "dff718ca-db66-4ce5-98b3-9585935b3dd1",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "deep house",
+      "edm",
+      "electronic",
+      "house",
+      "deep house"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Umek",
+    "mbid": "a03affe5-47af-48c4-9b8e-67654fa318ec",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "electronica",
+      "peak time techno",
+      "tech house",
+      "techno",
+      "electronica"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Zaimus",
+    "mbid": "6cd6dd6a-e79d-4054-8115-4bf8b2fac0e4",
+    "country": "ME",
+    "type": "Group",
+    "note": "Black Metal from Montenegro",
+    "tags": [
+      "black metal",
+      "black metal"
+    ],
+    "reason": "zanr"
+  },
+  {
+    "name": "Crveno i crno",
+    "mbid": "4cd6c7b5-a675-4f2d-a725-54b433a89805",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 1,
+    "reason": "samo 1 snimaka"
+  },
+  {
+    "name": "D Mol",
+    "mbid": "43245b7b-dbfa-43f6-a026-810c294886bb",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegrin vocal group",
+    "tags": [],
+    "recordings": 2,
+    "reason": "samo 2 snimaka"
+  },
+  {
+    "name": "Goblin Zeppelin",
+    "mbid": "f1a18292-7003-424d-b82f-539601d596fb",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 8,
+    "reason": "samo 8 snimaka"
+  },
+  {
+    "name": "Grim",
+    "mbid": "9474f6fe-b22e-44c7-afed-488bcb6295bf",
+    "country": "ME",
+    "type": "Group",
+    "note": "Rock from Montenegro",
+    "tags": [],
+    "recordings": 13,
+    "reason": "samo 13 snimaka"
+  },
+  {
+    "name": "Karacha",
+    "mbid": "d9033fac-eea5-4278-9c03-87d8ce1db8f3",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 7,
+    "reason": "samo 7 snimaka"
+  },
+  {
+    "name": "Makadam",
+    "mbid": "201a060a-c85c-4d2e-b9fd-698ea338ce0d",
+    "country": "ME",
+    "type": "Group",
+    "note": "Grupa",
+    "tags": [],
+    "recordings": 3,
+    "reason": "samo 3 snimaka"
+  },
+  {
+    "name": "Monteniggers",
+    "mbid": "7995cbb1-1bc0-47d0-9a82-4c13a97cdf42",
+    "country": "ME",
+    "type": "Group",
+    "note": "hip-hop band from Kotor, Montenegro, ex Yugoslavia",
+    "tags": [],
+    "recordings": 21,
+    "reason": "samo 21 snimaka"
+  },
+  {
+    "name": "NeonoeN",
+    "mbid": "02eea542-3807-4444-837e-007c307ed56c",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 0,
+    "reason": "samo 0 snimaka"
+  },
+  {
+    "name": "No Name",
+    "mbid": "4c0cc78a-6f95-41bb-89f7-0bcaa2d42d1a",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegrin pop group",
+    "tags": [],
+    "recordings": 1,
+    "reason": "samo 1 snimaka"
+  },
+  {
+    "name": "Perper",
+    "mbid": "abceaf84-c20a-407f-b5c1-fa73be02fa21",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 1,
+    "reason": "samo 1 snimaka"
+  },
+  {
+    "name": "Sijenke",
+    "mbid": "9da066e1-59c5-4bbf-bce9-2e9abf7b4fd5",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 18,
+    "reason": "samo 18 snimaka"
+  },
+  {
+    "name": "Wider Horizons",
+    "mbid": "d39043b8-1685-418f-93b2-71f5fd2e23df",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 0,
+    "reason": "samo 0 snimaka"
+  },
+  {
+    "name": "Highway",
+    "mbid": "eac5951d-85d1-4915-9b0b-b1509d733cbf",
+    "country": "ME",
+    "type": "Group",
+    "note": "Montenegrin band",
+    "tags": [
+      "pop",
+      "pop"
+    ],
+    "reason": "rucno: slabo poznat pop"
+  },
+  {
+    "name": "Disease",
+    "mbid": "cc2f8d8e-c8e1-4c1c-8ff6-3f6addde29c4",
+    "country": "MK",
+    "type": "Group",
+    "note": "Macedonian punk band",
+    "tags": [
+      "punk",
+      "macedonia",
+      "punk"
+    ],
+    "reason": "rucno: punk, slabo poznat"
+  },
+  {
+    "name": "Eliza Stark & The Dappers",
+    "mbid": "73511f74-f8dc-4536-9e6e-7db5b8373f1b",
+    "country": "ME",
+    "type": "Group",
+    "note": "rockabilly band based in Montenegro",
+    "tags": [
+      "rockabilly",
+      "rockabilly"
+    ],
+    "reason": "rucno: mali rockabilly sastav"
+  },
+  {
+    "name": "Ana-Marija Markovina",
+    "mbid": "308e5834-5506-4b75-a7c3-3320b38b7b5c",
+    "country": "HR",
+    "type": "Person",
+    "note": "pianist",
+    "tags": [],
+    "recordings": 1091,
+    "reason": "rucno: pijanistica, klasika"
+  },
+  {
+    "name": "Boban Marković Orkestar",
+    "mbid": "17b3b9ac-50d2-45a8-9319-1a7ffba14a14",
+    "country": "RS",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 435,
+    "reason": "rucno: limeni orkestar"
+  },
+  {
+    "name": "Damir Price",
+    "mbid": "f8a576e0-18d0-464a-8d3c-c10898024abb",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 411,
+    "reason": "rucno: nije izvodjac za pjesmaricu"
+  },
+  {
+    "name": "Titan Slayer",
+    "mbid": "a8ce563e-067f-4b84-8e42-30a3eba3f10d",
+    "country": "ME",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 189,
+    "reason": "rucno: metal"
+  },
+  {
+    "name": "Who See",
+    "mbid": "51b7b094-c761-4f4b-a3ac-5296f2f0acb1",
+    "country": "ME",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 126,
+    "reason": "rucno: hip-hop"
+  },
+  {
+    "name": "Ареа",
+    "mbid": "2e8c255b-2cc4-4913-afca-601d5a26dc24",
+    "country": "MK",
+    "type": "Group",
+    "note": "Macedonian band",
+    "tags": [],
+    "recordings": 73,
+    "reason": "rucno: slabo poznat"
+  },
+  {
+    "name": "Кочани Оркестар",
+    "mbid": "6427d4bb-1a78-4b6f-b222-514cee62df58",
+    "country": "MK",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 172,
+    "reason": "rucno: limeni orkestar"
+  }
+]

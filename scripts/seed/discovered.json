@@ -1,0 +1,230 @@
+[
+  {
+    "name": "Adi Smolar",
+    "mbid": "4bebf6da-7736-4d45-8e79-93c85e31cca1",
+    "country": "SI",
+    "type": "Person",
+    "note": "ml.",
+    "tags": [
+      "folk",
+      "pop",
+      "singer-songwriter",
+      "folk",
+      "pop"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Ana Popović",
+    "mbid": "c736d2e3-b1d2-4ae7-8f83-63af4e1c1de1",
+    "country": "RS",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "blues",
+      "rock",
+      "blues",
+      "rock"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Bata Illic",
+    "mbid": "619c55ae-7266-4622-ac02-58a4354b4c4a",
+    "country": "RS",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "schlager",
+      "schlager"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Ceca",
+    "mbid": "95e97643-3195-4d8f-b3e8-baeaeabcb79a",
+    "country": "RS",
+    "type": "Person",
+    "note": "Serbian singer",
+    "tags": [
+      "folk",
+      "turbo-folk",
+      "folk",
+      "turbo-folk"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Goran Bregović",
+    "mbid": "883ece23-2779-4091-b527-62eb07ee79d4",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "folk",
+      "folk rock",
+      "balkan",
+      "balkan rock",
+      "ethnic"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Helena Blagne",
+    "mbid": "ec9e0ff0-eb9e-4c61-ab3d-fa59a0861cac",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "pop",
+      "pop"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Vlado Kreslin",
+    "mbid": "6e7508ac-b3f3-4fb0-9c36-ba9fa155cf58",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [
+      "folk rock",
+      "singer-songwriter",
+      "folk rock",
+      "singer-songwriter",
+      "slovenian"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Baklava",
+    "mbid": "b201fc65-6132-4232-85a2-6b4cb0906eda",
+    "country": "MK",
+    "type": "Group",
+    "note": "",
+    "tags": [
+      "balkan folk music",
+      "ethno jazz",
+      "worldwide"
+    ],
+    "reason": "oznake",
+    "cyrillic": "Баклава"
+  },
+  {
+    "name": "Let 3",
+    "mbid": "443dfd6c-3e62-4040-9af3-a69a86411cd2",
+    "country": "HR",
+    "type": "Group",
+    "note": "",
+    "tags": [
+      "alternative rock",
+      "post-punk",
+      "alternative rock",
+      "eurovision 2023 artists",
+      "post-punk"
+    ],
+    "reason": "oznake"
+  },
+  {
+    "name": "Alen Islamović",
+    "mbid": "20bd7647-2495-4dd9-b0b3-469790e1bd9b",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 224,
+    "reason": "snimaka 224"
+  },
+  {
+    "name": "Andrej Šifrer",
+    "mbid": "d1488e66-8d0c-4941-9cc7-dcc5f17f77bb",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 246,
+    "reason": "snimaka 246"
+  },
+  {
+    "name": "Boris Novković",
+    "mbid": "bafccd0e-87bf-4810-8813-ef6b74c39fbb",
+    "country": "HR",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 393,
+    "reason": "snimaka 393"
+  },
+  {
+    "name": "Ivica Šerfezi",
+    "mbid": "d9a5df24-7ddf-4819-a48f-e73fc4b786dc",
+    "country": "YU",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 678,
+    "reason": "snimaka 678"
+  },
+  {
+    "name": "Jadranka Stojaković",
+    "mbid": "57e0f2c8-5387-41bf-84be-9341d9c5c2f9",
+    "country": "BA",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 223,
+    "reason": "snimaka 223"
+  },
+  {
+    "name": "Neca Falk",
+    "mbid": "b0491721-9fca-4bc6-aa3c-ed6fe0d407c9",
+    "country": "SI",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 188,
+    "reason": "snimaka 188"
+  },
+  {
+    "name": "Psihomodo Pop",
+    "mbid": "68e38dca-0ae0-4b2e-a5fa-62e39d6e89db",
+    "country": "HR",
+    "type": "Group",
+    "note": "",
+    "tags": [],
+    "recordings": 272,
+    "reason": "snimaka 272"
+  },
+  {
+    "name": "Rambo Amadeus",
+    "mbid": "fd673f97-a906-4eed-89a8-f58fe28ccc30",
+    "country": "ME",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 385,
+    "reason": "snimaka 385"
+  },
+  {
+    "name": "Kaliopi",
+    "mbid": "2d999b5f-fbb0-4ca7-bb0d-9f534c43ca41",
+    "country": "MK",
+    "type": "Person",
+    "note": "Macedonian singer Kaliopi Bukle",
+    "tags": [],
+    "recordings": 169,
+    "reason": "snimaka 169",
+    "cyrillic": "Калиопи"
+  },
+  {
+    "name": "Karolina Gočeva",
+    "mbid": "6fe98a86-93cf-4e5a-8269-163a117d24d5",
+    "country": "MK",
+    "type": "Person",
+    "note": "",
+    "tags": [],
+    "recordings": 153,
+    "reason": "snimaka 153",
+    "cyrillic": "Каролина Гочева"
+  }
+]
