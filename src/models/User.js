@@ -24,10 +24,37 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: {
       type: String,
-      required: true,
+      /**
+       * Required only for accounts that sign in with a password. An account
+       * created through Google has no password to hash, and demanding one would
+       * mean inventing a secret the owner never chose and cannot use.
+       */
+      required: function requiredWithoutGoogle() { return !this.googleId; },
       // Never ships in a query result unless explicitly selected.
       select: false
     },
+
+    /**
+     * Google's stable subject id, not the email: an address can be reassigned
+     * inside a workspace, the subject cannot.
+     *
+     * Left unset rather than null on accounts that do not use Google — see the
+     * trap note below.
+     */
+    /**
+     * AI-TRAP: no default. A sparse unique index skips documents where the field
+     * is ABSENT, not where it is null — so `default: null` gives every
+     * password account the same value and the second one ever created fails on
+     * a duplicate key. The failure looks like a broken registration, nowhere
+     * near this line.
+     */
+    googleId: { type: String, unique: true, sparse: true, select: false },
+
+    /**
+     * Whether the address is proven. Google tells us; a password signup does
+     * not, which is why linking the two is gated on this.
+     */
+    emailVerified: { type: Boolean, default: false },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
     /**
      * Password reset. Only the hash of the token is kept, so a database leak
