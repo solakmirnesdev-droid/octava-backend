@@ -23,7 +23,18 @@ const arrangementSchema = new mongoose.Schema(
 
     // Denormalised from the Rating collection so lists can sort without a join.
     ratingSum: { type: Number, default: 0 },
-    ratingCount: { type: Number, default: 0 }
+    ratingCount: { type: Number, default: 0 },
+
+    /**
+     * Soft delete, for the same reason the song has one.
+     *
+     * AI-DECISION: removing a version used to destroy it and then run
+     * Rating.deleteMany over its votes. Songs were made recoverable and their
+     * versions were not, which is the same mistake one level down — and the
+     * votes are the part that cannot be retyped. See AI-NOTES.md §5.
+     */
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' }
   },
   { timestamps: true }
 );
@@ -149,15 +160,19 @@ songSchema.pre('validate', async function (next) {
     this.searchTitle = slugify(this.title).replace(/-/g, ' ');
   }
 
-  // Exactly one primary. Fall back to the first if none was flagged.
-  if (this.arrangements?.length) {
-    const flagged = this.arrangements.filter((a) => a.isPrimary);
+  // Exactly one primary among the versions still in play. A deleted one holding
+  // the flag would leave the song with no default and the virtual falling back
+  // to whichever happened to be first.
+  const living = this.arrangements?.filter((a) => !a.deletedAt) || [];
+  if (living.length) {
+    const flagged = living.filter((a) => a.isPrimary);
     if (flagged.length !== 1) {
-      this.arrangements.forEach((a, i) => { a.isPrimary = i === 0; });
+      this.arrangements.forEach((a) => { a.isPrimary = false; });
+      living[0].isPrimary = true;
     }
-    // Keep the chord index in step with the content on every save.
-    this.arrangements.forEach((a) => { a.chords = extractChords(a.content); });
   }
+  // Keep the chord index in step with the content on every save.
+  this.arrangements?.forEach((a) => { a.chords = extractChords(a.content); });
 
   if (this.history?.length > MAX_HISTORY) {
     this.history = this.history.slice(-MAX_HISTORY);
@@ -166,9 +181,21 @@ songSchema.pre('validate', async function (next) {
   next();
 });
 
-/** The version shown by default: the primary one, or the first. */
+/**
+ * The versions still in play.
+ *
+ * AI-TRAP: everything that reads arrangements has to go through this. Reading
+ * the raw array shows deleted versions on the public site, which is the failure
+ * the soft delete exists to prevent.
+ */
+songSchema.virtual('livingArrangements').get(function () {
+  return (this.arrangements || []).filter((a) => !a.deletedAt);
+});
+
+/** The version shown by default: the primary one, or the first still in play. */
 songSchema.virtual('primary').get(function () {
-  return this.arrangements?.find((a) => a.isPrimary) || this.arrangements?.[0] || null;
+  const living = this.livingArrangements;
+  return living.find((a) => a.isPrimary) || living[0] || null;
 });
 
 /**
@@ -176,9 +203,10 @@ songSchema.virtual('primary').get(function () {
  * about "the chords for this song" do not have to know arrangements exist.
  */
 songSchema.methods.toPublic = function (arrangementId = null) {
-  const chosen = arrangementId
-    ? this.arrangements.id(arrangementId) || this.primary
-    : this.primary;
+  // A link to a deleted version falls back to the default rather than 404ing:
+  // somebody following an old bookmark wants the song, not an error.
+  const asked = arrangementId ? this.arrangements.id(arrangementId) : null;
+  const chosen = (asked && !asked.deletedAt) ? asked : this.primary;
 
   return {
     _id: this._id,
@@ -201,7 +229,7 @@ songSchema.methods.toPublic = function (arrangementId = null) {
     rating: chosen?.ratingCount ? chosen.ratingSum / chosen.ratingCount : 0,
     ratingCount: chosen?.ratingCount || 0,
 
-    arrangements: this.arrangements.map((a) => ({
+    arrangements: this.livingArrangements.map((a) => ({
       _id: a._id,
       label: a.label,
       originalKey: a.originalKey,

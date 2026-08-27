@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import AuditLog from '../models/AuditLog.js';
 import Review from '../models/Review.js';
 import ReviewComment from '../models/ReviewComment.js';
 
@@ -95,6 +96,17 @@ function moderate(Model, notFound) {
       doc.moderationReason = hide ? reason.slice(0, 500) : '';
       doc.moderatedAt = new Date();
       await doc.save();
+
+      // Hiding what a reader wrote is among the heaviest things the desk does,
+      // and the reason is the part worth keeping.
+      await AuditLog.record({
+        req,
+        action: hide ? 'hide' : 'unhide',
+        entity: Model.modelName === 'Review' ? 'review' : 'comment',
+        entityId: doc._id,
+        entityLabel: (doc.body || doc.text || '').slice(0, 80),
+        meta: hide ? { reason: doc.moderationReason } : undefined
+      });
 
       res.json({ ok: true, status: doc.status });
     } catch (err) { next(err); }

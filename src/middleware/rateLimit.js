@@ -113,6 +113,33 @@ export const contentLimiter = limiter({
 });
 
 /**
+ * The desk.
+ *
+ * These endpoints sit behind a staff session, so the threat is not a stranger
+ * hammering them — it is a loop in a script somebody wrote against the API, or
+ * a token that has leaked. A bulk edit touches up to 500 songs per call and an
+ * import walks the whole catalogue, so unbounded is the wrong default even
+ * among people you trust.
+ *
+ * AI-TRAP: keyed by address, not by account, and that is deliberate. This is
+ * mounted at the application level, ahead of requireStaff, so req.staff does
+ * not exist yet. Decoding the token here to get an id would mean trusting it
+ * unverified — and anyone who can forge one gets a fresh bucket per forgery,
+ * which is no limit at all. contentLimiter can key per account because it is
+ * mounted per route, after the session is resolved.
+ *
+ * Set well above what a person clicking through the tool ever reaches.
+ */
+export const staffLimiter = limiter({
+  windowMs: 60 * 1000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message,
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
+});
+
+/**
  * Everything a signed-out visitor can reach.
  *
  * Search runs a regex against the catalogue, so it is the cheapest request to

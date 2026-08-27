@@ -8,7 +8,8 @@ import { listReviews, createReview } from '../controllers/reviewController.js';
 import { create as createReport } from '../controllers/reportController.js';
 import {
   add as addArrangement, update as updateArrangement,
-  setPrimary as setPrimaryArrangement, remove as removeArrangement
+  setPrimary as setPrimaryArrangement, remove as removeArrangement,
+  restore as restoreArrangement, listRemoved as listRemovedArrangements
 } from '../controllers/arrangementController.js';
 import { contentLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
@@ -47,10 +48,14 @@ router.post('/:identifier/reviews', requireUser, contentLimiter, createReview);
 router.post('/:identifier/report', requireUser, contentLimiter, createReport);
 
 // Versions of a song. Editing chords is a worker's job, same as adding a song.
+// AI-TRAP: before the /:arrangementId routes, or 'removed' is taken for an id.
+router.get('/:identifier/arrangements/removed', requireStaff, requireRole('worker'), listRemovedArrangements);
+
 router.post('/:identifier/arrangements', requireStaff, requireRole('worker'), addArrangement);
 router.put('/:identifier/arrangements/:arrangementId', requireStaff, requireRole('worker'), updateArrangement);
 router.patch('/:identifier/arrangements/:arrangementId/primary', requireStaff, requireRole('worker'), setPrimaryArrangement);
 router.delete('/:identifier/arrangements/:arrangementId', requireStaff, requireRole('worker'), removeArrangement);
+router.post('/:identifier/arrangements/:arrangementId/restore', requireStaff, requireRole('worker'), restoreArrangement);
 
 router.post('/', requireStaff, requireRole('worker'), create);
 router.put('/:identifier', requireStaff, requireRole('worker'), update);

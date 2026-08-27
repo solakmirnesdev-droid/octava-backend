@@ -113,7 +113,7 @@ describe('verzije pjesme', () => {
     assert.equal(res.status, 409);
   });
 
-  test('brisanje verzije brise i njene glasove', async () => {
+  test('brisanje verzije cuva njene glasove i sklanja je sa sajta', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const second = added.body.song.arrangements.find((a) => !a.isPrimary);
@@ -127,9 +127,54 @@ describe('verzije pjesme', () => {
     });
     assert.equal(await Rating.countDocuments({ arrangement: second._id }), 1);
 
+    const res = await api(`/songs/${slug}/arrangements/${second._id}`, { method: 'DELETE', token });
+    assert.equal(res.status, 200);
+
+    // The version leaves the site immediately...
+    assert.equal(res.body.song.arrangements.length, 1);
+    const shown = await api(`/songs/${slug}`);
+    assert.equal(shown.body.song.arrangements.some((a) => String(a._id) === String(second._id)), false);
+
+    // ...but its votes stay. The text can be retyped; other people's judgement
+    // of whether the chart was right cannot, and it is what makes the version
+    // worth getting back.
+    assert.equal(await Rating.countDocuments({ arrangement: second._id }), 1,
+      'glasovi su unisteni, a verzija se moze vratiti');
+  });
+
+  test('obrisana verzija se moze vratiti sa svojim ocjenama', async () => {
+    const { slug, token } = await setup();
+    const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
+    const second = added.body.song.arrangements.find((a) => !a.isPrimary);
+
     await api(`/songs/${slug}/arrangements/${second._id}`, { method: 'DELETE', token });
-    assert.equal(await Rating.countDocuments({ arrangement: second._id }), 0,
-      'glasovi za obrisanu verziju nemaju znacenje');
+
+    const trash = await api(`/songs/${slug}/arrangements/removed`, { token });
+    assert.equal(trash.body.arrangements.length, 1);
+    assert.equal(trash.body.arrangements[0].label, 'Lakša');
+
+    const back = await api(`/songs/${slug}/arrangements/${second._id}/restore`, { method: 'POST', token });
+    assert.equal(back.status, 200);
+    assert.equal(back.body.song.arrangements.length, 2);
+  });
+
+  test('brisanje ne oslobadja mjesto ispod granice od sest', async () => {
+    const { slug, token } = await setup();
+    // One exists already, so five more fills the song.
+    for (let i = 2; i <= 6; i++) {
+      await addOne(slug, token, { label: 'V' + i, content: '[C]x', originalKey: 'C' });
+    }
+    const full = await api(`/songs/${slug}`);
+    assert.equal(full.body.song.arrangements.length, 6);
+
+    const doomed = full.body.song.arrangements.find((a) => !a.isPrimary);
+    await api(`/songs/${slug}/arrangements/${doomed._id}`, { method: 'DELETE', token });
+
+    // AI-TRAP: counting the raw array here would keep the song at six and
+    // refuse a replacement that should be allowed.
+    const added = await addOne(slug, token, { label: 'Nova', content: '[C]x', originalKey: 'C' });
+    assert.equal(added.status, 201);
+    assert.equal(added.body.song.arrangements.length, 6);
   });
 
   test('ocjene se vode odvojeno po verziji', async () => {

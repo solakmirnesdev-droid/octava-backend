@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import AuditLog, { diff } from '../models/AuditLog.js';
 import Staff from '../models/Staff.js';
 import { ROLE_RANK } from '../middleware/auth.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
@@ -103,6 +104,8 @@ export async function updateStaff(req, res, next) {
     const target = await Staff.findById(req.params.id);
     if (!target) return res.status(404).json({ message: 'Nalog nije pronađen.' });
 
+    const before = { role: target.role, active: target.active };
+
     // Removing your own powers, or switching yourself off, locks you out of
     // the screen you would need to undo it.
     if (target._id.equals(req.staff._id)) {
@@ -126,6 +129,17 @@ export async function updateStaff(req, res, next) {
     }
 
     await target.save();
+
+    // Changing somebody's rank is the single most consequential thing on the
+    // desk, and it used to leave no trace at all.
+    const changes = diff(before, { role: target.role, active: target.active }, ['role', 'active']);
+    if (changes.length) {
+      await AuditLog.record({
+        req, action: 'update', entity: 'staff',
+        entityId: target._id, entityLabel: target.email, changes
+      });
+    }
+
     res.json({ staff: { _id: target._id, role: target.role, active: target.active } });
   } catch (err) {
     next(err);
