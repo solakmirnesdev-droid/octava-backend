@@ -40,6 +40,20 @@ const artistSchema = new mongoose.Schema(
       match: [/^[A-Z]{2}$/, 'Zemlja mora biti dvoslovna oznaka (npr. BA).'],
       default: undefined
     },
+    /**
+     * Where they are from, and when they were working.
+     *
+     * The three facts a reader actually wants beside a name on a songbook —
+     * "Bijelo Dugme, Sarajevo, 1974–1989" says more than two paragraphs of
+     * biography, and unlike a biography it can be filled in from a sleeve.
+     */
+    origin: { type: String, trim: true, maxlength: 80 },
+    activeFrom: { type: Number, min: 1900, max: 2100 },
+    activeTo: { type: Number, min: 1900, max: 2100 },
+
+    /** One official link. Not a directory — a single place to go and hear them. */
+    website: { type: String, trim: true, maxlength: 200 },
+
     genres: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Genre', index: true }],
     songCount: { type: Number, default: 0 }
   },
@@ -102,7 +116,10 @@ artistSchema.methods.toCard = function toCard() {
     country: this.country || null,
     flag: this.flag(),
     hasImage: Boolean(this.imageBytes),
-    songCount: this.songCount || 0
+    songCount: this.songCount || 0,
+    origin: this.origin || null,
+    activeFrom: this.activeFrom || null,
+    activeTo: this.activeTo || null
   };
 };
 

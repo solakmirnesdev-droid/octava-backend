@@ -82,6 +82,7 @@ export async function getOne(req, res, next) {
       artist: {
         ...artist.toCard(),
         bio: artist.bio,
+        website: artist.website || null,
         genres: artist.genres,
         songs: songs.map((s) => s.toPublic())
       },
