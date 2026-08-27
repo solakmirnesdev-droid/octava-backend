@@ -72,6 +72,29 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-08-27 — Versions are recoverable too, and the desk leaves a trace
+- **What:** arrangements got the same `deletedAt` songs have, the audit log was
+  wired into artists, staff accounts, moderation and arrangements, and every
+  route group now has a rate limit.
+- **Why (versions):** removing one called `deleteOne()` and then
+  `Rating.deleteMany()` over its votes. Songs had been made recoverable and
+  their versions had not — the same mistake one level down, and the votes are
+  the part that cannot be retyped. They are other people's judgement of whether
+  the chart was right, gathered over time.
+- **Why (audit):** it covered songs only. A superadmin changing somebody's rank
+  and an admin hiding a reader's review — the two heaviest acts available —
+  left nothing behind, while a screen existed that looked like it showed
+  everything. Half-covered was worse than absent.
+- **Why (limits):** ten route groups had no ceiling at all, `/api/import` among
+  them. The threat behind a staff session is not a stranger but a loop in
+  somebody's script, or a leaked token.
+- **A test had to change.** `brisanje verzije brise i njene glasove` asserted
+  the old contract; it now asserts the new one and two more cover the trash and
+  the six-version ceiling.
+- **Affects:** `models/Song.js`, `controllers/arrangementController.js`,
+  `artistAdminController.js`, `accountController.js`, `moderationController.js`,
+  `middleware/rateLimit.js`, `app.js`, `routes/songs.js`.
+
 ### 2026-08-27 — The catalogue is Latin script, enforced in the schema
 - **What:** `utils/latinise.js` converts Serbian, Macedonian and Russian Cyrillic
   to Gaj's Latin, and the Song and Artist schemas run it on every save.
@@ -151,6 +174,23 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 - **Fix:** the conversion happens before the query.
 - **Files:** `models/Artist.js`.
 
+### A rate limiter mounted at app level cannot key on the account
+- **Symptom:** none — this is why `staffLimiter` keys by address while
+  `contentLimiter` keys by account.
+- **Cause:** `app.use('/api/audit', staffLimiter)` runs ahead of `requireStaff`,
+  so `req.staff` does not exist yet. Decoding the token there to get an id means
+  trusting it unverified, and anyone who can forge one gets a fresh bucket per
+  forgery — no limit at all. `contentLimiter` can key per account because it is
+  mounted per route, after the session is resolved.
+- **Files:** `middleware/rateLimit.js`, `app.js`.
+
+### Anything reading `song.arrangements` directly counts deleted versions
+- **Symptom:** would count deleted versions against the six-version ceiling,
+  number a new label wrongly, and hand a deleted version to the site.
+- **Fix:** `song.livingArrangements` everywhere, and `pick()` in the controller
+  refuses a deleted id. There is a test for the ceiling specifically.
+- **Files:** `models/Song.js`, `controllers/arrangementController.js`.
+
 ### Aggregations bypass the soft-delete query hook
 - **Symptom:** totals counted songs that were in the trash.
 - **Cause:** Mongoose query middleware does not run for `aggregate`.
@@ -193,10 +233,11 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 - [x] The two songs pointing at a deleted artist are resolved — both were test
       fixtures (one tagged `test`, one a draft reading "[Am]tekst"), so they went
       to the trash rather than being destroyed. Recoverable if that was wrong.
-- [ ] Soft delete covers songs only. `artistAdminController.remove` still hard-
+- [x] Soft delete now covers songs and their versions. Artists are still hard
+      deleted, but the endpoint refuses while any song points at them. `artistAdminController.remove` still hard-
       deletes an artist, and `arrangementController` hard-deletes a version.
-- [ ] The audit log records song create/update/delete/restore/purge/bulk. Artist,
-      account and moderation actions are not wired in yet.
+- [x] The audit log covers songs, arrangements, artists, staff accounts and
+      moderation. Genres and song requests are not wired in.
 - [ ] Turnstile is on Cloudflare's *test* keys; real ones needed before launch.
 - [ ] No `GOOGLE_CLIENT_ID` set, so Google sign-in is inert.
 - [ ] Redis was considered and deliberately deferred — only justified once there
