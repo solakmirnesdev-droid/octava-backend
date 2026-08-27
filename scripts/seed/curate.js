@@ -15,10 +15,10 @@ const DROP = new Map([
   ['Ana-Marija Markovina',      'pijanistica, klasika'],
   ['Titan Slayer',              'metal'],
   ['Who See',                   'hip-hop'],
-  ['Кочани Оркестар',           'limeni orkestar'],
+  ['Kočani Orkestar',           'limeni orkestar'],
   ['Boban Marković Orkestar',   'limeni orkestar'],
   ['Disease',                   'punk, slabo poznat'],
-  ['Ареа',                      'slabo poznat'],
+  ['Area',                      'slabo poznat'],
   ['Eliza Stark & The Dappers', 'mali rockabilly sastav'],
   ['Highway',                   'slabo poznat pop'],
   ['Damir Price',               'nije izvodjac za pjesmaricu']

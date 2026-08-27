@@ -90,7 +90,7 @@ neka [E]ljubi ko god koga [Am]hoće.
 
 [Strofa 2]
 [Am]Ako neće, nek se [Dm]ne nameće,
-od na[E]meta nema selа[Am]meta.
+od na[E]meta nema sela[Am]meta.
 
 [Strofa 3]
 [Am]Ja sam mlada, ja se [Dm]ne nametah,

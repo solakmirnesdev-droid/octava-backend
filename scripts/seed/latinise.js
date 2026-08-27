@@ -1,23 +1,20 @@
 /**
- * Puts Macedonian artists into Latin script and removes the duplicates that
- * caused.
+ * Puts discovered artists into Latin script and removes the duplicates that
+ * Cyrillic caused.
  *
- * MusicBrainz stores Macedonian artists in Cyrillic, so "Тоше Проески" arrived
- * as a brand new artist even though "Toše Proeski" was already in the
- * catalogue — the duplicate check compares names and those two never match.
- * The site is written in Latin script; the catalogue should be too.
+ * MusicBrainz stores Macedonian and Russian artists in Cyrillic, so
+ * "Тоше Проески" arrived as a brand new artist even though "Toše Proeski" was
+ * already in the catalogue — the duplicate check compares names, and those two
+ * never match.
+ *
+ * AI-NOTE: this used to carry a hand-written table of six names. It now uses the
+ * shared transliterator, which covers every name rather than the ones somebody
+ * remembered, and leaves no Cyrillic in this file for the next import to copy.
+ * The same conversion runs in the Song and Artist schemas, so the catalogue
+ * cannot take Cyrillic even if this script is skipped.
  */
 import fs from 'node:fs/promises';
-
-/** Written out rather than transliterated: a table cannot get a name wrong. */
-const LATIN = {
-  'Тоше Проески': 'Toše Proeski',
-  'Калиопи': 'Kaliopi',
-  'Каролина Гочева': 'Karolina Gočeva',
-  'Баклава': 'Baklava',
-  'Ареа': 'Area',
-  'Кочани Оркестар': 'Kočani Orkestar'
-};
+import { toLatin, hasCyrillic } from '../../src/utils/latinise.js';
 
 const dir = new URL('./', import.meta.url);
 const artists = JSON.parse(await fs.readFile(new URL('discovered.json', dir), 'utf8'));
@@ -30,8 +27,11 @@ let renamed = 0;
 let deduped = 0;
 
 for (const a of artists) {
-  const latin = LATIN[a.name];
-  if (latin) { a.cyrillic = a.name; a.name = latin; renamed++; }
+  if (hasCyrillic(a.name)) {
+    a.cyrillic = a.name;
+    a.name = toLatin(a.name);
+    renamed++;
+  }
 
   if (existing.has(a.name.toLowerCase())) {
     console.log(`  duplikat: ${a.name}${a.cyrillic ? ' (bio ' + a.cyrillic + ')' : ''} — vec u katalogu`);

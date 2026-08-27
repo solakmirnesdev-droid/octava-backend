@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { uniqueSlug, slugify } from '../utils/slug.js';
+import { toLatin, hasCyrillic } from '../utils/latinise.js';
 import { extractChords } from '../utils/chords.js';
 
 /**
@@ -79,13 +80,67 @@ const songSchema = new mongoose.Schema(
         editedAt: { type: Date, default: Date.now }
       }
     ]
+,
+
+    /**
+     * Soft delete.
+     *
+     * AI-DECISION: deleting a song hides it instead of destroying it. The
+     * catalogue is edited by several people against a database with no undo, and
+     * a title removed by mistake used to be gone with its arrangements, ratings
+     * and reviews. Purging is a separate, deliberate act. See AI-NOTES.md §5.
+     */
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' }
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
+/**
+ * Deleted songs are invisible unless asked for by name.
+ *
+ * AI-TRAP: this is a query hook rather than a `deletedAt: null` added at each
+ * call site, because there are dozens of call sites and forgetting one leaks a
+ * deleted song onto the public site — the failure this whole feature exists to
+ * prevent. Anything that genuinely needs the trash must opt in explicitly with
+ * `.setOptions({ withDeleted: true })`, which reads as the deliberate act it is.
+ */
+const SCOPED = [
+  'find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete',
+  'countDocuments', 'distinct', 'updateOne', 'updateMany'
+];
+
+songSchema.pre(SCOPED, function scopeToLiving() {
+  if (this.getOptions().withDeleted) return;
+  // An explicit deletedAt in the query is the caller saying what they want.
+  if ('deletedAt' in this.getQuery()) return;
+  this.where({ deletedAt: null });
+});
+
+/** Aggregations bypass query hooks entirely, so they get a stage instead. */
+songSchema.statics.livingMatch = function livingMatch(match = {}) {
+  return { ...match, deletedAt: null };
+};
+
 const MAX_HISTORY = 20;
 
 songSchema.pre('validate', async function (next) {
+  /**
+   * The catalogue is Latin script, without exception.
+   *
+   * AI-TRAP: this must run before the slug is built, or a Cyrillic title
+   * produces a slug from characters the site cannot serve. It is a conversion
+   * rather than a rejection on purpose — a rejection would fail an import
+   * halfway through and leave the catalogue in two scripts, which is worse than
+   * either one alone.
+   */
+  if (hasCyrillic(this.title)) this.title = toLatin(this.title);
+  for (const arrangement of this.arrangements || []) {
+    if (hasCyrillic(arrangement.content)) arrangement.content = toLatin(arrangement.content);
+    if (hasCyrillic(arrangement.label)) arrangement.label = toLatin(arrangement.label);
+  }
+  if (this.tags?.length) this.tags = this.tags.map(toLatin);
+
   if (!this.slug || this.isModified('title')) {
     this.slug = await uniqueSlug(this.constructor, this.title, this._id);
   }

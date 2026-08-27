@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { uniqueSlug, slugify } from '../utils/slug.js';
+import { toLatin, hasCyrillic } from '../utils/latinise.js';
 
 const artistSchema = new mongoose.Schema(
   {
@@ -46,6 +47,11 @@ const artistSchema = new mongoose.Schema(
 );
 
 artistSchema.pre('validate', async function (next) {
+  // MusicBrainz stores Macedonian and Russian artists in Cyrillic, which is how
+  // "Тоше Проески" once arrived as a second copy of "Toše Proeski" — the
+  // duplicate check compares names, and those two never match.
+  if (hasCyrillic(this.name)) this.name = toLatin(this.name);
+
   if (!this.slug || this.isModified('name')) {
     this.slug = await uniqueSlug(this.constructor, this.name, this._id);
   }
@@ -58,7 +64,11 @@ artistSchema.pre('validate', async function (next) {
 
 /** Finds an artist by name, or creates one. Used when a worker types a name. */
 artistSchema.statics.findOrCreateByName = async function (name) {
-  const trimmed = (name || '').trim();
+  // AI-TRAP: latinise before the lookup, not only on save. Searching for
+  // "Тоше Проески" never matches the stored "Toše Proeski", so the schema hook
+  // would convert it on create and produce a second copy of the same artist —
+  // the exact duplicate this function exists to prevent.
+  const trimmed = toLatin((name || '').trim());
   if (!trimmed) return null;
 
   const existing = await this.findOne({
