@@ -18,6 +18,7 @@ import commentRoutes from './routes/comments.js';
 import moderationRoutes from './routes/moderation.js';
 import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
+import auditRoutes from './routes/audit.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { publicLimiter } from './middleware/rateLimit.js';
 
@@ -101,6 +102,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/audit', auditRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

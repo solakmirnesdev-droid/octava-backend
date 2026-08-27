@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import { list, search, getOne, create, update, remove, related } from '../controllers/songController.js';
+import {
+  list, search, getOne, create, update, remove, related,
+  listTrash, restore, purge, bulk
+} from '../controllers/songController.js';
 import { rate, unrate, getRating } from '../controllers/ratingController.js';
 import { listReviews, createReview } from '../controllers/reviewController.js';
 import { create as createReport } from '../controllers/reportController.js';
@@ -19,6 +22,10 @@ router.get('/', validate({ query: songListQuery }), optionalAuth, list);
 router.get('/search', validate({ query: songSearchQuery }), optionalAuth, search);
 // Before the generic :identifier handler would not matter here — this path is
 // more specific — but it reads with the other song-scoped routes.
+// AI-TRAP: before the generic /:identifier handler, or 'trash' is taken for a
+// slug and the endpoint answers 404 for a route that exists.
+router.get('/trash', requireStaff, requireRole('admin'), listTrash);
+
 router.get('/:identifier/related', related);
 
 router.get('/:identifier', validate({ params: identifierParam, query: songDetailQuery }), optionalAuth, getOne);
@@ -47,6 +54,14 @@ router.delete('/:identifier/arrangements/:arrangementId', requireStaff, requireR
 
 router.post('/', requireStaff, requireRole('worker'), create);
 router.put('/:identifier', requireStaff, requireRole('worker'), update);
+// One edit across a selection. Worker-level: it is the same edits they can
+// already make one at a time, only without the afternoon.
+router.post('/bulk', requireStaff, requireRole('worker'), bulk);
+
 router.delete('/:identifier', requireStaff, requireRole('admin'), remove);
+router.post('/:identifier/restore', requireStaff, requireRole('admin'), restore);
+
+// Purging is the only irreversible action left, so it sits with the top rank.
+router.delete('/:identifier/purge', requireStaff, requireRole('superadmin'), purge);
 
 export default router;

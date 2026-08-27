@@ -9,6 +9,8 @@ export async function overview(_req, res, next) {
   try {
     const [totals, songs, artists, genres, users] = await Promise.all([
       Song.aggregate([
+        // Aggregations bypass the soft-delete query hook; exclude the trash here.
+        { $match: Song.livingMatch() },
         {
           $group: {
             _id: null,
@@ -67,7 +69,7 @@ export async function songs(req, res, next) {
       // A floor on views keeps a single view with a single save off the top.
       const MIN_VIEWS = 20;
       const pipeline = [
-        { $match: { ...filter, views: { $gte: MIN_VIEWS } } },
+        { $match: Song.livingMatch({ ...filter, views: { $gte: MIN_VIEWS } }) },
         { $addFields: { rate: { $divide: ['$favoriteCount', '$views'] } } },
         { $sort: { rate: -1, views: -1 } }
       ];
