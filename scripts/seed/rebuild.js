@@ -11,6 +11,7 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import Song from '../../src/models/Song.js';
+import { foldTitle } from '../../src/utils/foldTitle.js';
 import Artist from '../../src/models/Artist.js';
 import Genre from '../../src/models/Genre.js';
 import Staff from '../../src/models/Staff.js';
@@ -154,9 +155,17 @@ for (const [artistName, titles] of Object.entries(ALL)) {
   const artist = await Artist.findOrCreateByName(artistName);
   const genres = pickGenres(artistName).map((s) => genresBySlug[s]).filter(Boolean);
 
+  // AI-TRAP: this used to match on the exact title, which let "Bele ruze" and
+  // "Bele ruže" both through as separate songs. Compare on the folded form, and
+  // remember what this run itself adds. A real text is still never overwritten.
+  const seen = new Set(
+    (await Song.find({ artist: artist._id }, { title: 1 })).map((s) => foldTitle(s.title))
+  );
+
   for (const title of titles) {
-    // Never overwrite a public-domain song that already carries a real text.
-    if (await Song.findOne({ title, artist: artist._id })) { skipped++; continue; }
+    const key = foldTitle(title);
+    if (!key || seen.has(key)) { skipped++; continue; }
+    seen.add(key);
 
     const seed = hash(title + artistName);
     const prog = PROGRESSIONS[seed % PROGRESSIONS.length];
