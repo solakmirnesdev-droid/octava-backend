@@ -25,6 +25,7 @@ import mongoose from 'mongoose';
 import Artist from '../../src/models/Artist.js';
 import Song from '../../src/models/Song.js';
 import { recordingsOf, pause, fold } from '../lib/musicbrainz.js';
+import { toLatin } from '../../src/utils/latinise.js';
 
 const unpublish = process.argv.includes('--unpublish');
 
@@ -44,7 +45,7 @@ for (const [i, artist] of artists.entries()) {
 
   let known;
   try {
-    known = await recordingsOf(artist.mbid);
+    known = await recordingsOf(artist.mbid, { toLatin });
   } catch (err) {
     report.skipped.push({ artist: artist.name, reason: err.message });
     console.log(`  ${String(i + 1).padStart(3)}. ${artist.name.padEnd(24)} PRESKOCEN (${err.message.slice(0, 40)})`);

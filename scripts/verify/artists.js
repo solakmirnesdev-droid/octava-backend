@@ -24,6 +24,14 @@ import { findArtist, mb, countryOf, pause, fold } from '../lib/musicbrainz.js';
 import { toLatin } from '../../src/utils/latinise.js';
 
 const apply = process.argv.includes('--apply');
+/**
+ * Re-resolve an artist even when they already carry an id.
+ *
+ * AI-NOTE: needed once the search itself improved. An id assigned by a worse
+ * search stays wrong forever otherwise — "Kaliopi" was pinned to a 1980s band
+ * rather than to the solo singer whose songs we actually hold.
+ */
+const refresh = process.argv.includes('--refresh');
 
 await mongoose.connect(env.MONGODB_URI);
 const artists = await Artist.find().sort({ name: 1 });
@@ -74,7 +82,14 @@ for (const [i, artist] of artists.entries()) {
   if (!artist.origin && origin) { changes.push(`porijeklo=${origin}`); if (apply) artist.origin = origin; }
   if (!artist.activeFrom && begin) { changes.push(`od=${begin}`); if (apply) artist.activeFrom = Number(begin); }
   if (!artist.activeTo && end) { changes.push(`do=${end}`); if (apply) artist.activeTo = Number(end); }
-  if (!artist.mbid) { changes.push('mbid'); if (apply) artist.mbid = hit.id; }
+  if (!artist.mbid) {
+    changes.push('mbid');
+    if (apply) artist.mbid = hit.id;
+  } else if (refresh && artist.mbid !== hit.id) {
+    changes.push(`mbid ISPRAVLJEN`);
+    report.mismatched.push({ ours: artist.name, was: artist.mbid, now: hit.id, theirs: hit.name });
+    if (apply) artist.mbid = hit.id;
+  }
 
   // AI-TRAP: one artist that will not save must not end the run. The first
   // attempt died on Aleksa Šantić (born 1868) against a year floor of 1900, at
