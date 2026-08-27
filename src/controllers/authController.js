@@ -17,7 +17,7 @@ const INVALID = { message: 'Pogrešan email ili lozinka.' };
 
 export async function register(req, res, next) {
   try {
-    const { email, password, username } = req.body;
+    const { email, password, username, country } = req.body;
 
     if (!email || !password || !username) {
       return res.status(400).json({ message: 'Email, lozinka i korisničko ime su obavezni.' });
@@ -36,6 +36,9 @@ export async function register(req, res, next) {
     const user = await User.create({
       email: normalized,
       username: username.trim(),
+      // Optional at signup. Asking for it is worth a flag beside their reviews;
+      // requiring it is a form people abandon.
+      country: country ? String(country).toUpperCase().trim() : undefined,
       passwordHash: await User.hashPassword(password)
     });
 

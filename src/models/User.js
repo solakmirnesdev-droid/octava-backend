@@ -72,6 +72,34 @@ const userSchema = new mongoose.Schema(
      */
     passwordChangedAt: { type: Date, select: false },
 
+    /**
+     * Where the reader is.
+     *
+     * Two-letter ISO code, same shape the Artist carries, so one flag() serves
+     * both. Optional on purpose: a signup that demands a country before letting
+     * you save a song is a signup people abandon.
+     */
+    country: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      match: [/^[A-Z]{2}$/, 'Zemlja mora biti dvoslovna oznaka (npr. BA).'],
+      default: undefined
+    },
+
+    /**
+     * Portrait, stored in the document.
+     *
+     * AI-DECISION: same approach as the artist image — a small WebP kept beside
+     * the record rather than a file service. It is a thumbnail next to a review,
+     * so it never needs to be large, and one fewer moving part is worth more
+     * here than the theoretical scale. See AI-NOTES.md §5.
+     */
+    avatar: { type: Buffer, select: false },
+    avatarType: { type: String, enum: ['image/webp'], default: undefined },
+    avatarBytes: { type: Number, default: 0 },
+    avatarUpdatedAt: { type: Date, default: null },
+
     lastLoginAt: Date
   },
   { timestamps: true }
@@ -81,12 +109,44 @@ userSchema.methods.verifyPassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
+/**
+ * The flag, built from the country code.
+ *
+ * Regional indicator symbols sit at a fixed offset from A-Z, so BA becomes the
+ * two code points a font renders as one flag. Nothing is stored: a country has
+ * exactly one flag, and keeping both invites the two to disagree.
+ */
+userSchema.methods.flag = function flag() {
+  if (!this.country) return null;
+  return String.fromCodePoint(...[...this.country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+};
+
 /** Shape sent to clients. Never includes the hash. */
 userSchema.methods.toPublic = function () {
   return {
     id: this._id,
     email: this.email,
-    username: this.username
+    username: this.username,
+    country: this.country || null,
+    flag: this.flag(),
+    hasAvatar: Boolean(this.avatarBytes),
+    emailVerified: this.emailVerified,
+    createdAt: this.createdAt
+  };
+};
+
+/**
+ * What other readers see beside a review.
+ *
+ * AI-TRAP: never the email. It is on toPublic because that shape goes back to
+ * the account's own owner; a review is read by everybody.
+ */
+userSchema.methods.toCard = function toCard() {
+  return {
+    id: this._id,
+    username: this.username,
+    flag: this.flag(),
+    hasAvatar: Boolean(this.avatarBytes)
   };
 };
 

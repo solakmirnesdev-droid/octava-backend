@@ -13,6 +13,7 @@ import footerRoutes from './routes/footer.js';
 import statsRoutes from './routes/stats.js';
 import accountRoutes from './routes/accounts.js';
 import meRoutes from './routes/me.js';
+import userRoutes from './routes/users.js';
 import reviewRoutes from './routes/reviews.js';
 import commentRoutes from './routes/comments.js';
 import moderationRoutes from './routes/moderation.js';
@@ -20,7 +21,7 @@ import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import auditRoutes from './routes/audit.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
-import { publicLimiter } from './middleware/rateLimit.js';
+import { publicLimiter, staffLimiter } from './middleware/rateLimit.js';
 
 /**
  * Both are optional, and both fail open when unset — which is right for local
@@ -87,6 +88,24 @@ app.use('/api/genres', publicLimiter);
 app.use('/api/footer', publicLimiter);
 app.use('/api/stats', publicLimiter);
 
+/*
+ * Reader-facing routes that were reachable without any ceiling at all: an
+ * account, its saved songs, its reviews, its comments, its requests.
+ */
+app.use('/api/me', publicLimiter);
+app.use('/api/users', publicLimiter);
+app.use('/api/reviews', publicLimiter);
+app.use('/api/comments', publicLimiter);
+app.use('/api/requests', publicLimiter);
+app.use('/api/reports', publicLimiter);
+
+/* The desk. See staffLimiter for why these are not left open. */
+app.use('/api/accounts', staffLimiter);
+app.use('/api/moderation', staffLimiter);
+app.use('/api/notifications', staffLimiter);
+app.use('/api/import', staffLimiter);
+app.use('/api/audit', staffLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/songs', songRoutes);
 app.use('/api/artists', artistRoutes);
@@ -97,6 +116,7 @@ app.use('/api/footer', footerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/me', meRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/moderation', moderationRoutes);

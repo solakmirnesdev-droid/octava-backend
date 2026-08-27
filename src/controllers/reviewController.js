@@ -16,8 +16,28 @@ import Song from '../models/Song.js';
 const findByIdOrSlug = (identifier) =>
   mongoose.isValidObjectId(identifier) ? { _id: identifier } : { slug: identifier };
 
-/** Only ever expose the author's public identity, never their email. */
-const AUTHOR_FIELDS = 'username';
+/**
+ * Only ever the author's public identity, never their email.
+ *
+ * AI-TRAP: `avatarBytes` and not `avatar`. The bytes are all the client needs
+ * to know whether to draw a portrait or initials; selecting the buffer itself
+ * would attach a picture to every review on the page and turn a list of twenty
+ * into a payload nobody asked for.
+ */
+const AUTHOR_FIELDS = 'username country avatarBytes';
+
+/** Regional indicators sit at a fixed offset from A-Z. */
+const flagOf = (code) => (code
+  ? String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+  : null);
+
+/** What hangs beside a name: where they are, and whether they have a portrait. */
+const authorBits = (user) => ({
+  author: user?.username || null,
+  authorId: user?._id || user || null,
+  authorFlag: flagOf(user?.country),
+  authorHasAvatar: Boolean(user?.avatarBytes)
+});
 
 /** Trims and rejects the empty string that a body of only spaces collapses to. */
 function readBody(value, { max }) {
@@ -31,8 +51,7 @@ function shapeReview(review, viewerId) {
   return {
     _id: review._id,
     body: review.body,
-    author: review.user?.username || null,
-    authorId: review.user?._id || review.user || null,
+    ...authorBits(review.user),
     commentCount: review.commentCount || 0,
     createdAt: review.createdAt,
     editedAt: review.editedAt,
@@ -45,7 +64,7 @@ function shapeComment(comment, viewerId) {
     _id: comment._id,
     review: comment.review,
     body: comment.body,
-    author: comment.user?.username || null,
+    ...authorBits(comment.user),
     createdAt: comment.createdAt,
     editedAt: comment.editedAt,
     mine: viewerId ? String(comment.user?._id || comment.user) === String(viewerId) : false
