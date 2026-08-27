@@ -43,3 +43,36 @@ describe('rubrike', () => {
     assert.equal(grouped.style.length, 1);
   });
 });
+
+describe('filter po tagu', () => {
+  test('vraca samo pjesme s tim tagom', async () => {
+    const Staff = (await import('../src/models/Staff.js')).default;
+    await Staff.create({
+      email: 'radnik@test.local', name: 'Radnik', role: 'worker',
+      passwordHash: await Staff.hashPassword('lozinka1234')
+    });
+    const login = await api('/auth/staff/login', {
+      method: 'POST', body: { email: 'radnik@test.local', password: 'lozinka1234' }
+    });
+    const token = login.body.token;
+
+    const make = (title, tags) => api('/songs', {
+      method: 'POST', token,
+      body: { title, artist: 'Neko', content: '[Am]a', originalKey: 'Am', status: 'published', tags }
+    });
+    await make('Sa oznakom', ['bez-akorda']);
+    await make('Bez oznake', []);
+
+    const all = await api('/songs?status=all', { token });
+    assert.equal(all.body.songs.length, 2);
+
+    const tagged = await api('/songs?status=all&tag=bez-akorda', { token });
+    assert.equal(tagged.body.songs.length, 1);
+    assert.equal(tagged.body.songs[0].title, 'Sa oznakom');
+  });
+
+  test('nepoznat tag vraca prazno, ne sve', async () => {
+    const res = await api('/songs?tag=nepostojeci');
+    assert.equal(res.body.songs.length, 0);
+  });
+});

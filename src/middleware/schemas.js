@@ -10,7 +10,8 @@ export const songListQuery = pagination.extend({
   q: text(120).optional(),
   genre: text(80).optional(),
   sort: z.enum(['recent', 'popular', 'title', 'random']).optional(),
-  status: z.enum(['published', 'draft', 'all']).optional()
+  status: z.enum(['published', 'draft', 'all']).optional(),
+  tag: text(40).optional()
 }).strict();
 
 export const songSearchQuery = z.object({

@@ -71,6 +71,14 @@ export async function list(req, res, next) {
         : (req.query.status === 'published' ? 'published' : '__none__');
     }
 
+    /*
+     * Tags mark how a song got here and what it still needs — `uvoz` for an
+     * automated import, `bez-akorda` for one with a real title and no chords yet,
+     * `neprovjereno` for one MusicBrainz could not confirm. Without a filter those
+     * marks are invisible and nobody ever works through them.
+     */
+    if (req.query.tag) filter.tags = String(req.query.tag).toLowerCase();
+
     if (req.query.genre) {
       const genre = await Genre.findOne({ slug: req.query.genre });
       if (!genre) return res.json({ songs: [], meta: pageMeta(0, paging) });

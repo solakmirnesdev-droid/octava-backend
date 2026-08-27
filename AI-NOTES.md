@@ -72,6 +72,37 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-08-27 — The catalogue is checked against MusicBrainz, not trusted
+- **What:** `scripts/lib/musicbrainz.js` plus `scripts/verify/artists.js` and
+  `scripts/verify/songs.js`. All 139 artists were checked: every one is real and
+  from the region. 1531 of 1551 songs (99%) match a recording MusicBrainz holds
+  for that artist.
+- **Why:** the catalogue was assembled partly from imports and partly from names
+  and titles typed from memory, and the typed ones carried real mistakes —
+  "Kafana na Balkanu" was filed under Aco Pejović when it is Aca Lukas's. A
+  songbook that gets the attribution wrong is worse than one that is smaller.
+- **Matching is against recordings, not works.** A songbook cares that the
+  artist sang it, not that they wrote it: half this repertoire is other people's
+  songs sung well, and a writer-only check rejects almost all of it.
+- **Nothing is deleted on a failed match.** "MusicBrainz has no recording under
+  this title" and "this song does not exist" are different statements. The 20
+  unconfirmed songs are tagged `neprovjereno` and stay published.
+- **Affects:** `scripts/lib/`, `scripts/verify/`, `models/Artist.js` (mbid,
+  origin, activeFrom/To, verifiedAt).
+
+### 2026-08-27 — Deepen the verified artists before widening to new ones
+- **What:** `scripts/seed/deepen-catalogue.js` adds more real titles for the 137
+  artists already matched, capped at 30 each.
+- **Why:** every artist held twelve songs because twelve was the cap on the
+  first import, not because twelve is right. MusicBrainz knows 136 titles per
+  artist on average and 432 for Bijelo Dugme. Meanwhile a country-by-country
+  search turned up 1883 artists not in the catalogue — but their search `score`
+  is relevance to the query, not fame, and ranking by it surfaced a novelist and
+  a classical lutenist. Depth on known artists beats breadth into unknowns.
+- **New songs get an empty arrangement, not an invented progression.** A made-up
+  progression for a song nobody here has heard looks exactly like data somebody
+  checked. They arrive as drafts tagged `bez-akorda`, waiting for a person.
+
 ### 2026-08-27 — Versions are recoverable too, and the desk leaves a trace
 - **What:** arrangements got the same `deletedAt` songs have, the audit log was
   wired into artists, staff accounts, moderation and arrangements, and every
@@ -145,6 +176,44 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 ---
 
 ## 6. Traps & gotchas
+
+### The MusicBrainz lookup had three separate ways to lose a real artist
+- **Symptom:** eleven well-known artists — Toše Proeski, Zaim Imamović, Hanka
+  Paldum, Ceca — reported as not existing. Every one was a false negative.
+- **Causes, all three needed fixing:**
+  1. `artist:"Name"` returns nothing for half this repertoire; the unquoted
+     query finds them.
+  2. MusicBrainz stores Macedonian and Serbian artists in Cyrillic, so the name
+     coming back is "Тоше Проески" while ours is Latin. Compare after
+     transliterating, or every one reads as a different artist.
+  3. An exact name match with no country was being rejected. The region filter
+     exists to stop "Regina" matching a Brazilian singer, but no country means
+     unknown, not foreign.
+- **Files:** `scripts/lib/musicbrainz.js`.
+
+### Stopping at the first match picks the wrong artist
+- **Symptom:** "Kaliopi" resolved to a 1980s Yugoslav band whose nineteen
+  recordings share not one title with our twelve songs.
+- **Cause:** MusicBrainz holds her twice — the band under a Latin name, and
+  "Калиопи" the Macedonian solo singer under a Cyrillic one. The search broke
+  out of its loop as soon as the quoted query matched, so the Cyrillic entry was
+  never fetched.
+- **Fix:** the first two queries always run, and where two entries are both an
+  exact regional match the larger catalogue wins.
+- **Files:** `scripts/lib/musicbrainz.js`.
+
+### A flat page limit silently truncates the biggest catalogues
+- **Symptom:** nine well-known Bijelo Dugme songs reported as unconfirmed.
+- **Cause:** recordings were fetched to a fixed ceiling of 400; they have 432.
+- **Fix:** the limit follows the artist's actual `recording-count`.
+- **Files:** `scripts/lib/musicbrainz.js`.
+
+### Two names, one singer — only an id can tell you
+- **Symptom:** "Ceca" and "Svetlana Ražnatović" each held the same eleven songs.
+- **Cause:** a stage name and a legal name fold differently, so no name
+  comparison catches it. They share a MusicBrainz id.
+- **Fix:** `scripts/seed/merge-artists.js` groups by id, and takes the surviving
+  name from MusicBrainz — she is Ceca on every sleeve she has ever been on.
 
 ### A Cyrillic title produced the slug "pjesma-4"
 - **Symptom:** nine songs sat at `/pjesma/pjesma`, `/pjesma/pjesma-2` … useless
@@ -238,6 +307,13 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
       deletes an artist, and `arrangementController` hard-deletes a version.
 - [x] The audit log covers songs, arrangements, artists, staff accounts and
       moderation. Genres and song requests are not wired in.
+- [ ] 20 songs are tagged `neprovjereno`: MusicBrainz has no recording under
+      that title for that artist. Each is plausible and none was removed — they
+      need a person's ear, not a script's.
+- [ ] `scripts/seed/candidates.json` holds 1883 Balkan artists not in the
+      catalogue. Ranking them needs release-group counts, which is one request
+      each; the search `score` is relevance, not fame, and ranking by it surfaced
+      a novelist and a classical lutenist.
 - [ ] Turnstile is on Cloudflare's *test* keys; real ones needed before launch.
 - [ ] No `GOOGLE_CLIENT_ID` set, so Google sign-in is inert.
 - [ ] Redis was considered and deliberately deferred — only justified once there
