@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import express from 'express';
-import { listFavorites, addFavorite, removeFavorite } from '../controllers/meController.js';
+import {
+  listFavorites, addFavorite, removeFavorite,
+  listFavoriteArtists, addFavoriteArtist, removeFavoriteArtist
+} from '../controllers/meController.js';
 import {
   getProfile, updateProfile, changeEmail, changePassword,
   uploadAvatar, deleteAvatar
@@ -32,5 +35,11 @@ router.delete('/avatar', deleteAvatar);
 router.get('/favorites', listFavorites);
 router.post('/favorites/:songId', addFavorite);
 router.delete('/favorites/:songId', removeFavorite);
+
+// Saved artists live beside saved songs but on their own path: "show me what
+// they do next" and "I want to play this" are different acts.
+router.get('/artists', listFavoriteArtists);
+router.post('/artists/:artistId', addFavoriteArtist);
+router.delete('/artists/:artistId', removeFavoriteArtist);
 
 export default router;

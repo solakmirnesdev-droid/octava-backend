@@ -56,6 +56,17 @@ const userSchema = new mongoose.Schema(
      */
     emailVerified: { type: Boolean, default: false },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Song' }],
+
+    /**
+     * Saved artists, kept apart from saved songs.
+     *
+     * AI-DECISION: a second list rather than one polymorphic one. Following an
+     * artist and bookmarking a song are different acts — one says "show me what
+     * they do next", the other says "I want to play this" — and the saved page
+     * shows them under separate headings. A mixed list would need a type field
+     * on every entry to tell them apart again.
+     */
+    favoriteArtists: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Artist' }],
     /**
      * Password reset. Only the hash of the token is kept, so a database leak
      * yields no usable links.

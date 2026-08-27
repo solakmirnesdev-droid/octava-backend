@@ -65,7 +65,10 @@ const artistSchema = new mongoose.Schema(
     verifiedAt: { type: Date, default: null },
 
     genres: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Genre', index: true }],
-    songCount: { type: Number, default: 0 }
+    songCount: { type: Number, default: 0 },
+
+    /** Denormalised, so a list can sort by it without a join. */
+    favoriteCount: { type: Number, default: 0, index: true }
   },
   { timestamps: true }
 );
@@ -127,6 +130,7 @@ artistSchema.methods.toCard = function toCard() {
     flag: this.flag(),
     hasImage: Boolean(this.imageBytes),
     songCount: this.songCount || 0,
+    favoriteCount: this.favoriteCount || 0,
     origin: this.origin || null,
     activeFrom: this.activeFrom || null,
     activeTo: this.activeTo || null
