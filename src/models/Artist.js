@@ -48,11 +48,21 @@ const artistSchema = new mongoose.Schema(
      * biography, and unlike a biography it can be filled in from a sleeve.
      */
     origin: { type: String, trim: true, maxlength: 80 },
-    activeFrom: { type: Number, min: 1900, max: 2100 },
-    activeTo: { type: Number, min: 1900, max: 2100 },
+    activeFrom: { type: Number, min: 1800, max: 2100 },
+    activeTo: { type: Number, min: 1800, max: 2100 },
 
     /** One official link. Not a directory — a single place to go and hear them. */
     website: { type: String, trim: true, maxlength: 200 },
+
+    /**
+     * MusicBrainz id, once an artist has been matched to one.
+     *
+     * AI-NOTE: kept so a later run can go straight to the record rather than
+     * searching by name again — a name search returns whoever is most famous,
+     * which is how "Regina" once came back as a Brazilian singer.
+     */
+    mbid: { type: String, trim: true, index: true, sparse: true },
+    verifiedAt: { type: Date, default: null },
 
     genres: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Genre', index: true }],
     songCount: { type: Number, default: 0 }

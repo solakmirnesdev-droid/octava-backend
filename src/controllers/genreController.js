@@ -4,7 +4,15 @@ import { readPaging, pageMeta } from '../utils/pagination.js';
 
 export async function list(_req, res, next) {
   try {
-    const genres = await Genre.find().sort({ kind: 1, order: 1, name: 1 });
+    /**
+     * Only rubrics that lead somewhere.
+     *
+     * AI-DECISION: an empty rubric in the navigation is a promise the site
+     * cannot keep — "Strana" sat there with nothing behind it, and every visitor
+     * who tried it got an empty page. The row reappears on its own the moment a
+     * song is filed under it. See AI-NOTES.md §5.
+     */
+    const genres = await Genre.find({ songCount: { $gt: 0 } }).sort({ kind: 1, order: 1, name: 1 });
 
     // Grouped so the UI can render "Regija" and "Žanr" as separate rows
     // without needing to know the vocabulary in advance.
