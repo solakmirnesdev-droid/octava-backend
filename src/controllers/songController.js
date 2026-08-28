@@ -7,6 +7,7 @@ import Rating from '../models/Rating.js';
 import Review from '../models/Review.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
+import { visibilityFilter } from '../utils/visibility.js';
 import { scoreMatch } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
 
@@ -53,9 +54,7 @@ function byIdOrSlug(identifier) {
 }
 
 /** Drafts are visible to editors only. */
-function visibilityFilter(staff) {
-  return staff ? {} : { status: 'published' };
-}
+
 
 export async function list(req, res, next) {
   try {

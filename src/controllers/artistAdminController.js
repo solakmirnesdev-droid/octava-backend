@@ -11,7 +11,14 @@ import Genre from '../models/Genre.js';
  * song, which meant nobody could give one a picture, a country or a biography.
  */
 
-export const MAX_IMAGE_BYTES = 10 * 1024;
+/*
+ * AI-DECISION: raised from 10 KB to 100 KB. The pictures now come from Wikimedia
+ * Commons at a size worth looking at, and 10 KB forced a portrait down to
+ * something blurry. The bytes live inside the document, so this is a database
+ * cost, not a disk one: 137 artists at this ceiling is about 14 MB, which the
+ * nightly backup carries without noticing.
+ */
+export const MAX_IMAGE_BYTES = 100 * 1024;
 
 /**
  * A WebP file starts with "RIFF", four bytes of length, then "WEBP".

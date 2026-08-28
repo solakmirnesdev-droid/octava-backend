@@ -28,6 +28,19 @@ const artistSchema = new mongoose.Schema(
     /** Kept for artists whose picture lives somewhere else entirely. */
     imageUrl: String,
 
+    /*
+     * Who took the photograph, under what licence, and where it came from.
+     *
+     * AI-DECISION: not optional metadata — the licence is the reason the picture
+     * may be shown at all. CC BY and CC BY-SA are free only *with attribution*,
+     * so a portrait stored without these three fields is as much an infringement
+     * as one lifted off a search engine. The page renders them; nothing writes an
+     * image without them.
+     */
+    imageAuthor: { type: String, trim: true, maxlength: 200 },
+    imageLicense: { type: String, trim: true, maxlength: 80 },
+    imageSource: { type: String, trim: true, maxlength: 400 },
+
     /**
      * ISO 3166-1 alpha-2. Stored as the code rather than the flag, because the
      * code is what sorts, filters and survives a font that cannot draw flags —
@@ -188,6 +201,9 @@ artistSchema.methods.toCard = function toCard() {
     country: this.country || null,
     flag: this.flag(),
     hasImage: Boolean(this.imageBytes),
+    imageAuthor: this.imageAuthor || null,
+    imageLicense: this.imageLicense || null,
+    imageSource: this.imageSource || null,
     songCount: this.songCount || 0,
     favoriteCount: this.favoriteCount || 0,
     origin: this.origin || null,

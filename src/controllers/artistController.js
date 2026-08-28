@@ -3,9 +3,28 @@ import Genre from '../models/Genre.js';
 import Song from '../models/Song.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
+import { visibilityFilter } from '../utils/visibility.js';
 
 /** Escapes user input before it is used inside a RegExp. */
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * How many songs of each artist a reader can actually open.
+ *
+ * AI-TRAP: `Artist.songCount` is not that number. It is a denormalised counter
+ * bumped once per song created, drafts included — and this catalogue is mostly
+ * drafts, so the list promised "30 songs" for an artist whose page then showed
+ * ten. The counter is not wrong for what it counts; it is the wrong thing to
+ * show a visitor. Computed here instead of maintained, because a count that is
+ * derived cannot drift out of step with the rows it describes.
+ */
+async function visibleCounts(ids, staff) {
+  const rows = await Song.aggregate([
+    { $match: { ...visibilityFilter(staff), artist: { $in: ids } } },
+    { $group: { _id: '$artist', n: { $sum: 1 } } }
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r.n]));
+}
 
 export async function list(req, res, next) {
   try {
@@ -81,6 +100,8 @@ export async function list(req, res, next) {
       ratings.map((r) => [String(r._id), { rating: r.count ? r.sum / r.count : 0, ratingCount: r.count }])
     );
 
+    const visible = await visibleCounts(artists.map((a) => a._id), req.staff);
+
     res.json({
       /**
        * toCard rather than the raw documents: it adds the flag and a plain
@@ -89,6 +110,8 @@ export async function list(req, res, next) {
        */
       artists: artists.map((a) => ({
         ...a.toCard(),
+        // What the reader can open, not what the counter was told to remember.
+        songCount: visible.get(String(a._id)) || 0,
         genres: a.genres,
         bio: a.bio,
         rating: ratingMap[String(a._id)]?.rating || 0,
@@ -128,6 +151,11 @@ export async function getOne(req, res, next) {
     res.json({
       artist: {
         ...artist.toCard(),
+        // Same correction as the list: toCard() carries the denormalised counter,
+        // which includes drafts. `total` is already the number of songs this
+        // caller can open, so the header cannot promise more than the page below
+        // it delivers.
+        songCount: total,
         bio: artist.bio,
         website: artist.website || null,
         genres: artist.genres,
