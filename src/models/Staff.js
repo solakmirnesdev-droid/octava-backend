@@ -69,7 +69,20 @@ const staffSchema = new mongoose.Schema(
     /** Highest counter already accepted, so a code cannot be replayed. */
     totpLastCounter: { type: Number, select: false },
     /** Hashed single-use recovery codes. */
-    backupCodes: { type: [String], select: false, default: [] }
+    backupCodes: { type: [String], select: false, default: [] },
+
+    /**
+     * Email as a second factor. Independent of totpEnabled: an account may have
+     * either, both, or neither, and a login offers whichever are switched on.
+     *
+     * The code is hashed for the same reason the password is — a database copy
+     * should not hand somebody a working login — and the attempt counter is what
+     * stops six digits from being guessed inside the challenge window.
+     */
+    emailOtpEnabled: { type: Boolean, default: false },
+    emailOtpHash: { type: String, select: false },
+    emailOtpExpires: { type: Date, select: false },
+    emailOtpAttempts: { type: Number, select: false, default: 0 }
   },
   // Pinned, because the default pluraliser would name this 'staffs'.
   { timestamps: true, collection: 'staff' }
@@ -85,7 +98,8 @@ staffSchema.methods.toPublic = function () {
     email: this.email,
     name: this.name,
     role: this.role,
-    totpEnabled: this.totpEnabled
+    totpEnabled: this.totpEnabled,
+    emailOtpEnabled: this.emailOtpEnabled
   };
 };
 

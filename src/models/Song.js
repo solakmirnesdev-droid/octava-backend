@@ -218,7 +218,8 @@ songSchema.methods.toPublic = function (arrangementId = null) {
     year: this.year,
     youtubeId: this.youtubeId,
     status: this.status,
-    views: this.views,
+    views: this.views || 0,
+    favoriteCount: this.favoriteCount || 0,
 
     content: chosen?.content || '',
     originalKey: chosen?.originalKey || '',

@@ -43,7 +43,7 @@ for (const entry of TRADITIONAL) {
   if (existing) {
     existing.arrangements = [{ ...arrangement, _id: existing.arrangements[0]?._id }];
     existing.genres = genres.map((g) => g._id);
-    existing.tags = ['javno-vlasnistvo'];
+    existing.tags = entry.needsReview ? ['javno-vlasnistvo', 'treba-provjeru'] : ['javno-vlasnistvo'];
     existing.status = 'published';
     existing.updatedBy = editor._id;
     await existing.save();
@@ -56,7 +56,7 @@ for (const entry of TRADITIONAL) {
     artist: artist._id,
     genres: genres.map((g) => g._id),
     // Greppable: these are the songs that can be published without asking.
-    tags: ['javno-vlasnistvo'],
+    tags: entry.needsReview ? ['javno-vlasnistvo', 'treba-provjeru'] : ['javno-vlasnistvo'],
     status: 'published',
     createdBy: editor._id,
     updatedBy: editor._id,

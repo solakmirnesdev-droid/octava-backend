@@ -126,13 +126,82 @@ export async function remove(req, res, next) {
       });
     }
 
+    artist.deletedAt = new Date();
+    artist.deletedBy = req.staff._id;
+    await artist.save();
+
+    await AuditLog.record({
+      req, action: 'delete', entity: 'artist',
+      entityId: artist._id, entityLabel: artist.name
+    });
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
+/**
+ * Deleted artists, newest first.
+ *
+ * AI-DECISION: artists were the last thing in the tool that a delete destroyed
+ * outright. Songs have had a bin and a way back for a while, and the asymmetry
+ * was not a decision anybody made — it was simply never revisited. A soft delete
+ * with nowhere to see it would be worse than a hard one, so this ships with the
+ * bin rather than after it.
+ */
+export async function listTrash(req, res, next) {
+  try {
+    const artists = await Artist.find({ deletedAt: { $ne: null } })
+      .populate('deletedBy', 'name')
+      .sort({ deletedAt: -1 })
+      .limit(100);
+
+    res.json({ artists: artists.map((a) => ({ ...a.toCard(), deletedAt: a.deletedAt, deletedBy: a.deletedBy })) });
+  } catch (err) { next(err); }
+}
+
+export async function restore(req, res, next) {
+  try {
+    const artist = await Artist.findOne(byIdOrSlug(req.params.identifier)).setOptions({ withDeleted: true });
+    if (!artist) return res.status(404).json({ message: 'Izvođač nije pronađen.' });
+    if (!artist.deletedAt) return res.status(409).json({ message: 'Izvođač nije obrisan.' });
+
+    artist.deletedAt = null;
+    artist.deletedBy = undefined;
+    await artist.save();
+
+    await AuditLog.record({
+      req, action: 'restore', entity: 'artist',
+      entityId: artist._id, entityLabel: artist.name
+    });
+
+    res.json({ artist: artist.toCard() });
+  } catch (err) { next(err); }
+}
+
+export async function purge(req, res, next) {
+  try {
+    const artist = await Artist.findOne(byIdOrSlug(req.params.identifier)).setOptions({ withDeleted: true });
+    if (!artist) return res.status(404).json({ message: 'Izvođač nije pronađen.' });
+    if (!artist.deletedAt) {
+      return res.status(409).json({ message: 'Prvo obriši izvođača, pa ga onda možeš trajno ukloniti.' });
+    }
+
+    // Checked again rather than trusted: a song can be moved onto this artist
+    // between the delete and the purge, and that would orphan it for good.
+    const songs = await Song.countDocuments({ artist: artist._id });
+    if (songs) {
+      return res.status(409).json({
+        message: `Izvođač ima ${songs} pjesama. Prebaci ih prije trajnog uklanjanja.`
+      });
+    }
+
     const label = artist.name;
     await artist.deleteOne();
 
     // The name is the only thing left once the document is gone, which is why
     // the log copies it in rather than referencing it.
     await AuditLog.record({
-      req, action: 'delete', entity: 'artist',
+      req, action: 'purge', entity: 'artist',
       entityId: artist._id, entityLabel: label
     });
 

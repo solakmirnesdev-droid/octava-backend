@@ -1,3 +1,4 @@
+import Artist from '../models/Artist.js';
 import Genre from '../models/Genre.js';
 import Song from '../models/Song.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
@@ -42,18 +43,36 @@ export async function getOne(req, res, next) {
       ? { views: -1, title: 1 }
       : req.query.sort === 'title' ? { title: 1 } : { createdAt: -1 };
 
-    const [songs, total] = await Promise.all([
+    const [songs, total, topArtists, spotlightSongs, relatedGenres, artistCount] = await Promise.all([
       Song.find(filter)
-        .populate('artist', 'name slug')
+        .populate('artist', 'name slug country imageBytes')
         .sort(sort)
         .skip(paging.skip)
         .limit(paging.limit),
-      Song.countDocuments(filter)
+      Song.countDocuments(filter),
+      Artist.find({ genres: genre._id })
+        .sort({ songCount: -1, name: 1 })
+        .limit(6),
+      Song.find({ genres: genre._id, status: 'published' })
+        .populate('artist', 'name slug country imageBytes')
+        .sort({ views: -1 })
+        .limit(3),
+      Genre.find({ _id: { $ne: genre._id }, songCount: { $gt: 0 } })
+        .sort({ order: 1, name: 1 })
+        .limit(6),
+      Artist.countDocuments({ genres: genre._id })
     ]);
 
     res.json({
       genre,
       songs: songs.map((s) => s.toPublic()),
+      topArtists: topArtists.map((a) => a.toCard()),
+      spotlight: spotlightSongs.map((s) => s.toPublic()),
+      relatedGenres: relatedGenres.map((g) => ({ _id: g._id, name: g.name, slug: g.slug, songCount: g.songCount })),
+      stats: {
+        totalSongs: total,
+        totalArtists: artistCount
+      },
       meta: pageMeta(total, paging)
     });
   } catch (err) {

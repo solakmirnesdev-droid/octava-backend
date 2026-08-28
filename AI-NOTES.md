@@ -177,6 +177,22 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 6. Traps & gotchas
 
+### Out of copyright is not the same as correct
+- **Symptom:** ten traditional songs were added to `scripts/seed/traditional.js`
+  on 2026-08-27 with lyrics and chords written from recall of the oral
+  tradition. Two were pulled again before seeding: they were Aleksa Šantić's,
+  and a named poet's verse reconstructed from memory is not that poet's verse
+  however long the term has expired.
+- **Cause:** the public-domain test answers "may this be published", which is a
+  different question from "is this right". Anonymous folk texts drift between
+  regions and singers, so there is no single correct version to check against —
+  and a verse remembered wrong reads on the page exactly like a verse checked.
+- **Fix:** the eight that stayed carry `needsReview: true` in the seed and the
+  tag `treba-provjeru` in the database, surfaced on the songbook page. They are
+  published rather than held back because a marked draft somebody can correct
+  beats an empty catalogue — but the mark is the point. Do not strip it in bulk.
+- **Files:** `scripts/seed/traditional.js`, `scripts/seed/load.js`.
+
 ### The MusicBrainz lookup had three separate ways to lose a real artist
 - **Symptom:** eleven well-known artists — Toše Proeski, Zaim Imamović, Hanka
   Paldum, Ceca — reported as not existing. Every one was a false negative.

@@ -48,6 +48,10 @@ const artistSchema = new mongoose.Schema(
      * biography, and unlike a biography it can be filled in from a sleeve.
      */
     origin: { type: String, trim: true, maxlength: 80 },
+
+    /** Soft delete, same shape as Song's. See the scoping hook below. */
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
     activeFrom: { type: Number, min: 1800, max: 2100 },
     activeTo: { type: Number, min: 1800, max: 2100 },
 
@@ -90,6 +94,30 @@ artistSchema.pre('validate', async function (next) {
 });
 
 /** Finds an artist by name, or creates one. Used when a worker types a name. */
+/*
+ * Deleted artists disappear from every ordinary query.
+ *
+ * AI-DECISION: the same list and the same shape as Song's, on purpose. Two soft
+ * deletes that behave differently is worse than one — a caller should not have
+ * to remember which model hides its dead rows and which does not.
+ */
+const SCOPED = [
+  'find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete',
+  'countDocuments', 'distinct', 'updateOne', 'updateMany'
+];
+
+artistSchema.pre(SCOPED, function scopeToLiving() {
+  if (this.getOptions().withDeleted) return;
+  // An explicit deletedAt in the query is the caller saying what they want.
+  if ('deletedAt' in this.getQuery()) return;
+  this.where({ deletedAt: null });
+});
+
+/** Aggregations bypass query hooks entirely, so they get a stage instead. */
+artistSchema.statics.livingMatch = function livingMatch(match = {}) {
+  return { ...match, deletedAt: null };
+};
+
 artistSchema.statics.findOrCreateByName = async function (name) {
   // AI-TRAP: latinise before the lookup, not only on save. Searching for
   // "Тоше Проески" never matches the stored "Toše Proeski", so the schema hook
@@ -98,11 +126,30 @@ artistSchema.statics.findOrCreateByName = async function (name) {
   const trimmed = toLatin((name || '').trim());
   if (!trimmed) return null;
 
+  /*
+   * AI-TRAP: this has to look past the soft delete, and it is not optional.
+   * `slug` is a unique index, so a deleted artist still owns theirs. Scoped to
+   * living rows this finds nothing, calls create(), and the pre-validate hook
+   * generates the same slug the dead row is holding — a duplicate key error, so
+   * adding a song by a previously deleted performer would fail with a 500.
+   *
+   * Reviving is also simply what the act means: adding a song by somebody you
+   * deleted is asking for them back, not asking for a second copy.
+   */
   const existing = await this.findOne({
     name: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-  });
+  }).setOptions({ withDeleted: true });
 
-  return existing || this.create({ name: trimmed });
+  if (existing) {
+    if (existing.deletedAt) {
+      existing.deletedAt = null;
+      existing.deletedBy = undefined;
+      await existing.save();
+    }
+    return existing;
+  }
+
+  return this.create({ name: trimmed });
 };
 
 
@@ -113,8 +160,20 @@ artistSchema.statics.findOrCreateByName = async function (name) {
  * two code points that a font renders as one flag. Nothing is stored: a country
  * has exactly one flag and duplicating it invites the two to disagree.
  */
+/**
+ * Codes with no state behind them, and therefore no flag.
+ *
+ * AI-TRAP: 🇾🇺 is a valid pair of regional indicators — the arithmetic below
+ * happily produces it — but Unicode never assigned it and no font draws it, so
+ * it lands on the page as two letters in dotted boxes. Six artists here are
+ * coded YU because that is what MusicBrainz holds for a Yugoslav-era act, so
+ * this is not a hypothetical. The site's own utils/countries.js carries the
+ * same list; change one, change both.
+ */
+const NO_FLAG = new Set(['YU', 'CS', 'SU', 'DD']);
+
 artistSchema.methods.flag = function flag() {
-  if (!this.country) return null;
+  if (!this.country || NO_FLAG.has(this.country.toUpperCase())) return null;
   return String.fromCodePoint(
     ...[...this.country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
   );

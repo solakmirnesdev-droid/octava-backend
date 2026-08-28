@@ -7,6 +7,7 @@ import Rating from '../models/Rating.js';
 import Review from '../models/Review.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
+import { scoreMatch } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
 
 /**
@@ -16,7 +17,7 @@ import { youtubeId } from '../utils/youtube.js';
  * Song.history, and recording counters and timestamps would bury the edits a
  * person actually made under noise nobody reads.
  */
-const AUDITED = ['title', 'artist', 'status', 'genres', 'tags', 'youtubeId'];
+const AUDITED = ['title', 'artist', 'status', 'genres', 'tags', 'youtubeId', 'year'];
 
 const snapshot = (song) => Object.fromEntries(AUDITED.map((f) => [f, song[f]]));
 
@@ -105,52 +106,164 @@ export async function list(req, res, next) {
   }
 }
 
+/**
+ * A year a song could actually have been recorded, or undefined.
+ *
+ * AI-DECISION: `year` has been on the Song schema and in `toPublic()` since the
+ * beginning, so the site has always been able to show it — but no handler ever
+ * read it off the request and no form ever sent one, which made it a field that
+ * existed everywhere except where a value could come from. Bounded rather than
+ * merely coerced: a mistyped 20255 or a pasted track number would otherwise sit
+ * in the catalogue looking like data.
+ */
+function validYear(input) {
+  if (input === null || input === '') return null;      // an explicit clear
+  if (input === undefined) return undefined;            // absent: leave alone
+  const year = Number(input);
+  if (!Number.isInteger(year)) return undefined;
+  return year >= 1900 && year <= new Date().getFullYear() + 1 ? year : undefined;
+}
+
 export async function search(req, res, next) {
   try {
     const q = (req.query.q || '').trim();
     const paging = readPaging(req.query);
+    const nothing = { songs: [], artists: [], genres: [], suggestion: null, meta: pageMeta(0, paging) };
 
-    if (!q) {
-      return res.json({ songs: [], artists: [], genres: [], meta: pageMeta(0, paging) });
-    }
+    if (!q) return res.json(nothing);
 
     // Fold the query the same way the stored copies were folded, so "noc",
     // "noć" and "NOĆ" all reach the same songs.
     const folded = slugify(q).replace(/-/g, ' ');
-    if (!folded) return res.json({ songs: [], artists: [], genres: [], meta: pageMeta(0, paging) });
+    if (!folded) return res.json(nothing);
 
     const pattern = new RegExp(escapeRegex(folded), 'i');
+    const visible = visibilityFilter(req.staff);
 
-    // One query cannot answer "did they mean a song, a performer, or a rubric",
-    // so all three are searched and returned separately for the UI to group.
-    // Only the songs are paged; the other two are navigation hints and stay
-    // short whatever page the reader is on.
-    const [artists, genres] = await Promise.all([
-      // country and imageBytes are what toCard turns into the flag and the
-      // hasImage flag; selecting only name/slug/songCount silently produced
-      // results with neither.
-      Artist.find({ searchName: pattern })
-        .select('name slug songCount country imageBytes').limit(10),
-      Genre.find({ name: new RegExp(escapeRegex(q), 'i') }).select('name slug').limit(10)
-    ]);
+    /*
+     * Two passes, and the second one only runs when the first comes up short.
+     *
+     * AI-DECISION: the substring pass uses the indexed searchTitle/searchName
+     * and answers almost every real query. The fuzzy pass reads every visible
+     * row and scores it in memory, which is only defensible because the
+     * catalogue is small — 1570 published songs is well under a megabyte of
+     * folded text. It is deliberately NOT cached: a stale index would make a
+     * song just added by the dashboard unfindable, and this path is rare enough
+     * that reading it fresh costs less than getting invalidation wrong.
+     *
+     * AI-TRAP: if the catalogue ever grows past roughly ten thousand songs this
+     * becomes the wrong shape and needs a real index behind it. The fast path
+     * will keep working; it is the typo path that will start dragging.
+     */
+    let corrected = false;
 
-    const filter = {
-      ...visibilityFilter(req.staff),
-      $or: [
-        { searchTitle: pattern },
-        { artist: { $in: artists.map((a) => a._id) } }
-      ]
-    };
+    const rank = (rows, textOf) => rows
+      .map((row) => ({ row, score: scoreMatch(folded, textOf(row) || '') }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
 
-    const [songs, total] = await Promise.all([
-      Song.find(filter)
-        .populate('artist', 'name slug')
-        .populate('genres', 'name slug')
-        .sort({ views: -1 })
-        .skip(paging.skip)
-        .limit(paging.limit),
-      Song.countDocuments(filter)
-    ]);
+    // ── artists ────────────────────────────────────────────────────────────
+    const artistFields = 'name slug songCount country imageBytes searchName';
+    let artistHits = rank(
+      await Artist.find({ searchName: pattern }).select(artistFields),
+      (a) => a.searchName
+    );
+
+    // ── genres ─────────────────────────────────────────────────────────────
+    const genreHits = rank(
+      await Genre.find({ name: new RegExp(escapeRegex(q), 'i') }).select('name slug'),
+      (g) => slugify(g.name).replace(/-/g, ' ')
+    );
+    const genres = genreHits.slice(0, 10).map((x) => x.row);
+
+    // ── songs ──────────────────────────────────────────────────────────────
+    /*
+     * A song reached through its performer has no title match of its own, so it
+     * would score zero and be dropped. It inherits the artist's score instead,
+     * discounted so that a song whose own title matches always sorts above one
+     * that merely shares a performer with the query.
+     */
+    const projection = 'searchTitle views artist';
+    let rows = await Song.find({
+      ...visible,
+      $or: [{ searchTitle: pattern }, { artist: { $in: artistHits.map((x) => x.row._id) } }]
+    }).select(projection).lean();
+
+    /*
+     * The fuzzy pass is a fallback, not a supplement, and it is decided here —
+     * once, on whether anything was found as typed at all.
+     *
+     * AI-TRAP: it used to be decided per source, so an artist lookup that found
+     * nothing would drop to fuzzy even when the songs had matched perfectly. A
+     * search for "emina" — eighteen songs by that name, no artist called that —
+     * pulled in every performer within one edit of the word and offered to
+     * correct a query that was already right. A fallback that fires while the
+     * fast path is succeeding is not a fallback.
+     */
+    if (!rows.length && !artistHits.length) {
+      corrected = true;
+      artistHits = rank(await Artist.find().select(artistFields), (a) => a.searchName);
+      rows = await Song.find(visible).select(projection).lean();
+    }
+
+    const artists = artistHits.slice(0, 10).map((x) => x.row);
+    const viaArtist = new Map(artistHits.map((x) => [String(x.row._id), Math.round(x.score * 0.6)]));
+
+    const scored = rows
+      .map((row) => {
+        // Kept apart from the combined score: a song that only matched through
+        // its performer must not be able to answer "did you mean".
+        const titleScore = scoreMatch(folded, row.searchTitle || '');
+        return {
+          row,
+          titleScore,
+          score: Math.max(titleScore, viaArtist.get(String(row.artist)) || 0)
+        };
+      })
+      .filter((x) => x.score > 0)
+      // Views break ties only. Sorting by them outright — which is what this did
+      // before — let a popular song with an incidental substring outrank the
+      // song the reader actually named.
+      .sort((a, b) => b.score - a.score || (b.row.views || 0) - (a.row.views || 0));
+
+    const total = scored.length;
+    const pageIds = scored.slice(paging.skip, paging.skip + paging.limit).map((x) => x.row._id);
+
+    const found = await Song.find({ _id: { $in: pageIds } })
+      .populate('artist', 'name slug')
+      .populate('genres', 'name slug');
+
+    // $in returns documents in whatever order the index hands back, so the
+    // ranking has to be reapplied after the fetch or it is thrown away here.
+    const byId = new Map(found.map((doc) => [String(doc._id), doc]));
+    const songs = pageIds.map((id) => byId.get(String(id))).filter(Boolean);
+
+    /*
+     * What the reader probably meant, when nothing matched as typed.
+     *
+     * AI-TRAP: this cannot just take the first song. Somebody typing "bijelo
+     * dugne" is naming a performer, and the top result is whichever of their
+     * songs ranked highest — so the offer came back as "did you mean Kosovska",
+     * naming a song the reader has never heard of instead of the band they
+     * misspelled. Whichever of the two actually scored higher against the query
+     * supplies the text, and a song only qualifies on its own title.
+     */
+    let suggestion = null;
+    if (corrected) {
+      const bestArtist = artistHits[0] || null;
+      const bestTitle = scored.reduce(
+        (best, x) => (x.titleScore > (best?.titleScore || 0) ? x : best), null
+      );
+
+      if (bestArtist && (bestArtist.score >= (bestTitle?.titleScore || 0))) {
+        suggestion = bestArtist.row.name;
+      } else if (bestTitle) {
+        // Usually already fetched; only the rare off-page winner costs a query.
+        suggestion = byId.get(String(bestTitle.row._id))?.title
+          || (await Song.findById(bestTitle.row._id).select('title'))?.title
+          || null;
+      }
+    }
 
     res.json({
       songs: songs.map((s) => s.toPublic()),
@@ -158,6 +271,7 @@ export async function search(req, res, next) {
       // the raw documents carried neither.
       artists: artists.map((a) => a.toCard()),
       genres,
+      suggestion,
       meta: pageMeta(total, paging)
     });
   } catch (err) {
@@ -171,7 +285,7 @@ export async function getOne(req, res, next) {
       ...byIdOrSlug(req.params.identifier),
       ...visibilityFilter(req.staff)
     })
-      .populate('artist', 'name slug')
+      .populate('artist', 'name slug country imageBytes')
       .populate('genres', 'name slug');
 
     if (!song) return res.status(404).json({ message: 'Pjesma nije pronađena.' });
@@ -187,7 +301,7 @@ export async function getOne(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, label, youtube } = req.body;
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, label, youtube, year } = req.body;
 
     if (!title || !artist || !content || !originalKey) {
       return res.status(400).json({ message: 'Naslov, izvođač, tekst i tonalitet su obavezni.' });
@@ -206,6 +320,7 @@ export async function create(req, res, next) {
       status: status === 'published' ? 'published' : 'draft',
       // Rejected input leaves the field unset rather than storing junk.
       youtubeId: youtubeId(youtube) || undefined,
+      year: validYear(year) ?? undefined,
       createdBy: req.staff._id,
       updatedBy: req.staff._id,
       arrangements: [{
@@ -246,10 +361,15 @@ export async function update(req, res, next) {
 
     const before = snapshot(song);
 
-    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, arrangementId, youtube } = req.body;
+    const { title, artist, content, originalKey, capo, difficulty, tags, genres, status, arrangementId, youtube, year } = req.body;
 
     if (title) song.title = title;
     if (tags) song.tags = tags;
+
+    // null clears it, a bad value is ignored, absent leaves it as it was.
+    const nextYear = validYear(year);
+    if (nextYear !== undefined) song.year = nextYear;
+    else if (year === null || year === '') song.year = undefined;
 
     if (genres) {
       const next = await resolveGenres(genres);

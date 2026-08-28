@@ -11,6 +11,13 @@
  * canonical texts; verify against a source before treating any of them as
  * definitive.
  *
+ * AI-TRAP: the ten entries added 2026-08-27 (from 'Mujo kuje konja' down) were
+ * written from recall of the oral tradition, not copied from a source. Being out
+ * of copyright is not the same as being correct: anonymous folk texts drift
+ * between regions and singers, and a verse remembered wrong reads exactly like a
+ * verse checked. Every one of them carries the tag `treba-provjeru` until a
+ * person who knows the song has read it. Do not strip that tag in bulk.
+ *
  * Notation is ours: H for the twelfth degree, sharps instead of flats.
  */
 export const TRADITIONAL = [
@@ -293,5 +300,189 @@ neg' tebe, du[E]šo, neg' tebe, du[Am]šo.
 [Strofa 3]
 [Am]Ako mene mnogo [Dm]žališ,
 što me osta[E]vljaš, što me osta[Am]vljaš?`
+  },
+  {
+    title: 'Mujo kuje konja po mjesecu',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['sevdalinka', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Mujo kuje konja po mje[Dm]secu,
+Mujo [E]kuje konja po mje[Am]secu.
+
+[Strofa 2]
+[Am]Majka mu se u odaji [Dm]ljuti,
+majka [E]mu se u odaji [Am]ljuti.
+
+[Strofa 3]
+[Am]Oj, Mujica, moje [Dm]dijete drago,
+oj, Mu[E]jica, moje dijete [Am]drago.
+
+[Strofa 4]
+[Am]Šta ćeš noćas kroz mrak puto[Dm]vati,
+šta ćeš [E]noćas kroz mrak putova[Am]ti?`
+  },
+  {
+    title: "Il' je vedro, il' oblačno",
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['sevdalinka', 'domaca'],
+    originalKey: 'Dm',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Dm]Il' je vedro, il' ob[Gm]lačno,
+il' je [A]dan, il' je [Dm]noć.
+
+[Strofa 2]
+[Dm]Il' je meni mila [Gm]draga,
+il' je [A]sama, il' je [Dm]s njim.
+
+[Strofa 3]
+[Dm]Nit' je vedro, nit' ob[Gm]lačno,
+nit' je [A]dan, nit' je [Dm]noć.
+
+[Strofa 4]
+[Dm]Već je meni mila [Gm]draga
+sa dru[A]gim se zami[Dm]lila.`
+  },
+  {
+    title: 'Djevojka sokolu zulum učinila',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['sevdalinka', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Djevojka sokolu [Dm]zulum učinila,
+[E]zulum uči[Am]nila.
+
+[Strofa 2]
+[Am]Uzela mu, uzela [Dm]zlaćena krila,
+[E]zlaćena [Am]krila.
+
+[Strofa 3]
+[Am]Podaj meni, djevojko, [Dm]zlaćena krila,
+[E]zlaćena [Am]krila.
+
+[Strofa 4]
+[Am]Da ja letim, djevojko, [Dm]gori i doli,
+[E]gori i [Am]doli.`
+  },
+  {
+    title: 'Razbolje se lijepa Hajrija',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['sevdalinka', 'domaca'],
+    originalKey: 'Dm',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Dm]Razbolje se lijepa [Gm]Hajrija,
+[A]lijepa Haj[Dm]rija.
+
+[Strofa 2]
+[Dm]Pod jablanom, ladnom [Gm]vodicom,
+[A]ladnom vo[Dm]dicom.
+
+[Strofa 3]
+[Dm]Dolazi joj majka [Gm]rođena,
+[A]majka ro[Dm]đena.
+
+[Strofa 4]
+[Dm]Šta te boli, moja [Gm]Hajrija,
+[A]moja Haj[Dm]rija?`
+  },
+  {
+    title: 'Oj, javore, javore',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['narodna', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Oj, javore, ja[Dm]vore,
+zeleni ja[E]vore, zeleni ja[Am]vore.
+
+[Strofa 2]
+[Am]Pod tobom je [Dm]ladovina,
+ladna vo[E]dica, ladna vo[Am]dica.
+
+[Strofa 3]
+[Am]Na vodici [Dm]djevojka,
+lijepa dje[E]vojka, lijepa dje[Am]vojka.
+
+[Strofa 4]
+[Am]Zahvatila [Dm]vodicu,
+pa je pro[E]lila, pa je pro[Am]lila.`
+  },
+  {
+    title: 'Igrale se delije',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['narodna', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Igrale se de[E]lije
+nasred zemlje Sr[Am]bije.
+
+[Strofa 2]
+[Am]Nasred zemlje Sr[E]bije,
+igrale se de[Am]lije.
+
+[Strofa 3]
+[Am]Tanana je de[E]lija,
+igra kolo naj[Am]bolje.
+
+[Strofa 4]
+[Am]Igra kolo naj[E]bolje,
+tanana je de[Am]lija.`
+  },
+  {
+    title: 'Ajde Kato, ajde zlato',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['narodna', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Ajde, Kato, ajde, [Dm]zlato,
+ajde, [E]Kato, da igra[Am]mo.
+
+[Strofa 2]
+[Am]Da igramo, da pje[Dm]vamo,
+da se [E]mladi radu[Am]jemo.
+
+[Strofa 3]
+[Am]Mladost prođe, ne po[Dm]vrati,
+starost [E]dođe, ne za[Am]stati.`
+  },
+  {
+    title: 'Zvijezda tjera mjeseca',
+    needsReview: true,
+    artist: 'Tradicionalna',
+    genres: ['sevdalinka', 'domaca'],
+    originalKey: 'Am',
+    capo: 0,
+    difficulty: 'easy',
+    content: `[Strofa 1]
+[Am]Zvijezda tjera mje[Dm]seca,
+mjesec [E]tjera zvijez[Am]du.
+
+[Strofa 2]
+[Am]Čekaj mene, mje[Dm]sece,
+da za[E]jedno gre[Am]jemo.
+
+[Strofa 3]
+[Am]Ja ću gorom, ti pri[Dm]morjem,
+ja ću [E]rano, ti pred [Am]zoru.`
   }
 ];

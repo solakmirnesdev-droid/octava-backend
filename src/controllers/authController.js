@@ -6,6 +6,8 @@ import {
 } from '../utils/session.js';
 import { signChallenge, verifyToken, REALM_STAFF_CHALLENGE } from '../utils/jwt.js';
 import { verifyCode, consumeBackupCode } from '../utils/totp.js';
+import { checkOtp } from '../utils/emailOtp.js';
+import { issueEmailCode, clearOtp, otpError } from './twoFactorController.js';
 import Notification from '../models/Notification.js';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -104,9 +106,29 @@ export async function staffLogin(req, res, next) {
 
     // With a second factor set, the password alone buys nothing but a
     // five-minute ticket to the next step. No session is issued here.
-    if (staff.totpEnabled) {
+    if (staff.totpEnabled || staff.emailOtpEnabled) {
+      const methods = [];
+      if (staff.totpEnabled) methods.push('totp');
+      if (staff.emailOtpEnabled) methods.push('email');
+
+      /*
+       * A code goes out now only when email is the sole factor. With an
+       * authenticator also on the account, most logins never need one, and
+       * sending regardless would put a code in the mailbox every single time —
+       * training the reader to ignore exactly the message that would warn them
+       * somebody else had their password.
+       */
+      if (staff.emailOtpEnabled && !staff.totpEnabled) {
+        // Re-read with the code fields selected; they are select:false, so the
+        // document above cannot persist them.
+        const withOtp = await Staff.findById(staff._id)
+          .select('+emailOtpHash +emailOtpExpires +emailOtpAttempts');
+        await issueEmailCode(withOtp);
+      }
+
       return res.json({
         twoFactorRequired: true,
+        methods,
         challenge: signChallenge(staff._id)
       });
     }
@@ -151,23 +173,56 @@ export async function staffLoginVerify(req, res, next) {
     }
 
     const staff = await Staff.findById(payload.sub)
-      .select('+totpSecret +totpLastCounter +backupCodes');
+      .select('+totpSecret +totpLastCounter +backupCodes +emailOtpHash +emailOtpExpires +emailOtpAttempts');
 
-    if (!staff || !staff.active || !staff.totpEnabled) {
+    if (!staff || !staff.active || (!staff.totpEnabled && !staff.emailOtpEnabled)) {
       return res.status(401).json(INVALID);
     }
 
-    const counter = verifyCode(staff.totpSecret, staff.email, code, staff.totpLastCounter);
+    /*
+     * Whichever factor the account has, plus recovery codes, all through one
+     * field. The reader types six digits; which system produced them is not
+     * something they should have to tell us.
+     */
+    let accepted = false;
+    let reason = 'Pogrešan kod.';
 
-    if (counter !== null) {
-      staff.totpLastCounter = counter;
-    } else {
-      // Not a valid code; it may still be a recovery code.
-      const remaining = await consumeBackupCode(code, staff.backupCodes);
-      if (!remaining) {
-        return res.status(400).json({ message: 'Pogrešan kod.' });
+    if (staff.totpEnabled) {
+      const counter = verifyCode(staff.totpSecret, staff.email, code, staff.totpLastCounter);
+      if (counter !== null) {
+        staff.totpLastCounter = counter;
+        accepted = true;
       }
-      staff.backupCodes = remaining;
+    }
+
+    if (!accepted && staff.emailOtpEnabled) {
+      const verdict = await checkOtp(code, {
+        hash: staff.emailOtpHash, expires: staff.emailOtpExpires, attempts: staff.emailOtpAttempts
+      });
+
+      if (verdict === 'ok') {
+        clearOtp(staff);
+        accepted = true;
+      } else {
+        // Counted even though a backup code might still save this attempt: the
+        // guess was spent either way, and not counting it is the hole.
+        if (verdict === 'wrong') staff.emailOtpAttempts += 1;
+        reason = otpError(verdict);
+      }
+    }
+
+    if (!accepted) {
+      const remaining = await consumeBackupCode(code, staff.backupCodes);
+      if (remaining) {
+        staff.backupCodes = remaining;
+        accepted = true;
+      }
+    }
+
+    if (!accepted) {
+      // Saved so the attempt counter survives the rejection.
+      await staff.save();
+      return res.status(400).json({ message: reason });
     }
 
     staff.lastLoginAt = new Date();
@@ -178,6 +233,38 @@ export async function staffLoginVerify(req, res, next) {
       user: staff.toPublic(),
       backupCodesRemaining: staff.backupCodes.length
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Another code, mid-login.
+ *
+ * AI-DECISION: authorised by the challenge, not by a session — the whole point
+ * is that the reader does not have one yet. The challenge is already a signed,
+ * five-minute, single-account ticket, so it is exactly the right key: it cannot
+ * be used to mail codes to an address the holder did not just prove a password
+ * for, and it expires on its own.
+ */
+export async function staffResendEmailCode(req, res, next) {
+  try {
+    let payload;
+    try {
+      payload = verifyToken(req.body.challenge, REALM_STAFF_CHALLENGE);
+    } catch {
+      return res.status(401).json({ message: 'Prijava je istekla. Pokušaj ponovo.' });
+    }
+
+    const staff = await Staff.findById(payload.sub)
+      .select('+emailOtpHash +emailOtpExpires +emailOtpAttempts');
+
+    if (!staff || !staff.active || !staff.emailOtpEnabled) {
+      return res.status(401).json(INVALID);
+    }
+
+    await issueEmailCode(staff);
+    res.json({ sent: true });
   } catch (err) {
     next(err);
   }

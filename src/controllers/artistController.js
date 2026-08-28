@@ -18,6 +18,12 @@ export async function list(req, res, next) {
       filter.genres = genre._id;
     }
 
+    // Stored as an ISO alpha-2 code, or the defunct YU for a Yugoslav-era
+    // artist. Upper-cased here so a link carrying ?country=ba still matches.
+    if (req.query.country) {
+      filter.country = String(req.query.country).toUpperCase().slice(0, 2);
+    }
+
     if (req.query.q) {
       const folded = slugify(req.query.q).replace(/-/g, ' ');
       if (folded) filter.searchName = new RegExp(escapeRegex(folded), 'i');
@@ -30,16 +36,50 @@ export async function list(req, res, next) {
       if (letter) filter.slug = new RegExp('^' + letter, 'i');
     }
 
-    const [artists, total, letters] = await Promise.all([
+    const [artists, total, letters, countries] = await Promise.all([
       Artist.find(filter).populate('genres', 'name slug').sort({ name: 1 })
         .skip(paging.skip).limit(paging.limit),
       Artist.countDocuments(filter),
       // Which initials actually have artists, so the UI can grey out the rest.
       Artist.aggregate([
+        // AI-TRAP: aggregations do not run the scoping hook, so a deleted
+        // artist keeps their initial lit up in the alphabet strip and their
+        // country in the facet below unless it is filtered here by hand.
+        { $match: Artist.livingMatch() },
         { $group: { _id: { $toUpper: { $substrCP: ['$slug', 0, 1] } } } },
         { $sort: { _id: 1 } }
+      ]),
+      /*
+       * Which countries actually have artists, with counts.
+       *
+       * Deliberately unfiltered, exactly as `letters` is: a facet that empties
+       * as you use it strands the reader on a page with nothing to click but
+       * back. Artists with no country set — 14 of them — are left out rather
+       * than gathered into an "unknown" pill; they are reachable with no filter
+       * on, which is where somebody who is not filtering already is.
+       */
+      Artist.aggregate([
+        { $match: Artist.livingMatch({ country: { $nin: [null, ''] } }) },
+        { $group: { _id: '$country', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } }
       ])
     ]);
+
+    const artistIds = artists.map((a) => a._id);
+    const ratings = await Song.aggregate([
+      { $match: { artist: { $in: artistIds }, status: 'published' } },
+      { $unwind: '$arrangements' },
+      {
+        $group: {
+          _id: '$artist',
+          sum: { $sum: '$arrangements.ratingSum' },
+          count: { $sum: '$arrangements.ratingCount' }
+        }
+      }
+    ]);
+    const ratingMap = Object.fromEntries(
+      ratings.map((r) => [String(r._id), { rating: r.count ? r.sum / r.count : 0, ratingCount: r.count }])
+    );
 
     res.json({
       /**
@@ -47,8 +87,15 @@ export async function list(req, res, next) {
        * hasImage flag, and it stops searchName, imageBytes and __v from
        * travelling to every client that lists artists.
        */
-      artists: artists.map((a) => ({ ...a.toCard(), genres: a.genres, bio: a.bio })),
+      artists: artists.map((a) => ({
+        ...a.toCard(),
+        genres: a.genres,
+        bio: a.bio,
+        rating: ratingMap[String(a._id)]?.rating || 0,
+        ratingCount: ratingMap[String(a._id)]?.ratingCount || 0
+      })),
       letters: letters.map((l) => l._id).filter((l) => /^[A-Z]$/.test(l)),
+      countries: countries.map((c) => ({ code: c._id, count: c.count })),
       meta: pageMeta(total, paging)
     });
   } catch (err) {

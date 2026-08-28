@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { sanitize } from './middleware/sanitize.js';
 import authRoutes from './routes/auth.js';
 import songRoutes from './routes/songs.js';
 import artistRoutes from './routes/artists.js';
@@ -51,6 +52,10 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '256kb' }));
+
+// After the body is parsed and before any route sees it. Schemas do the real
+// refusing; this is the floor under the routes that do not have one yet.
+app.use(sanitize);
 
 /**
  * Health, checked rather than assumed.

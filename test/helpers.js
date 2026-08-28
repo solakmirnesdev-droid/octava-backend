@@ -18,7 +18,24 @@ const suite = (process.argv[1] || 'unknown')
   .replace(/\.test\.js$/, '')
   .replace(/[^a-z0-9]/gi, '_');
 
-process.env.MONGODB_URI = `mongodb://127.0.0.1:27017/octava_test_${suite}`;
+/*
+ * The real credentials, pointed at a throwaway database.
+ *
+ * AI-TRAP: this used to be a hard-coded `mongodb://127.0.0.1:27017/...` with no
+ * user in it, which worked only because the server accepted anyone. With
+ * authorization enabled that string fails to connect and every one of the 221
+ * tests errors at `before`. The credentials come from .env; only the database
+ * name is swapped, so a test run still cannot touch real data.
+ */
+const ENV = new URL('../.env', import.meta.url).pathname;
+const base = (await import('node:fs')).readFileSync(ENV, 'utf8')
+  .split('\n').find((line) => line.startsWith('MONGODB_URI='))?.slice('MONGODB_URI='.length).trim();
+
+if (!base) throw new Error('MONGODB_URI nije u .env — testovi ne znaju kako da se poveze.');
+
+const uri = new URL(base);
+uri.pathname = `/octava_test_${suite}`;
+process.env.MONGODB_URI = uri.toString();
 process.env.JWT_SECRET = 'test-secret-not-used-anywhere-else-0123456789';
 process.env.NODE_ENV = 'test';
 
