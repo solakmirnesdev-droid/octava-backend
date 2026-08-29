@@ -72,6 +72,154 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-08-30 — Audit: can an outsider get the real sheet? (no)
+
+Probed unauthenticated against a running server, looking for lyric-only words
+and chord markup in every response.
+
+- **Content leaves this process through one door.** `toPublic` emits it only on
+  `withContent: true`, which appears in `getOne` (gated) and eight staff-only
+  handlers. Every other public route — list, search, related, reviews, rating,
+  `/artists/:slug`, `/genres/:slug`, stats, footer — carries none.
+- **Clean under bypass attempts:** `?arrangement=<id>`, `?status=all`,
+  `?withContent=true`, id instead of slug, and the `/api/v1` mount.
+- **Drafts and soft-deleted songs are 404 to an outsider**, by slug and by id;
+  `/songs/trash` is 401. Tested with planted songs carrying a unique marker.
+- **NoSQL injection is refused at the schema:** `status[$ne]`, `q[$ne]`,
+  `arrangement[$ne]`, `status[$regex]` all return 400. Zod is typed *and*
+  `.strict()`, so an object where a string belongs never reaches Mongo.
+- **Forged tokens rejected:** `alg: none` and a signature made with a guessed
+  secret both stay locked. `JWT_SECRET` is 64 characters, 41 distinct.
+
+Two things were fixed as a result:
+
+- **`Cache-Control` was absent and `Vary` was only `Origin`.** The body depends
+  on who asked, and nothing upstream could tell from the URL — a CDN in front of
+  the API would have cached one subscriber's unlocked sheet and served it to
+  every anonymous visitor after them. Now `private, no-store` and
+  `Vary: Origin, Authorization, Cookie`. **This only ever fails in production;**
+  do not remove it because nothing caches it in dev.
+- **`jwt.verify` did not pin the algorithm.** No behaviour change today, but a
+  token is trusted on the strength of that call — now `algorithms: ['HS256']`.
+
+- **Files:** `controllers/songController.js`, `utils/jwt.js`.
+
+### 2026-08-30 — 594 seeded sheets replaced with an honest line
+
+- **What was there:** Latin filler for words and a *fabricated* chord chart. The
+  chords were the worse half — across all 594 songs there were only ten distinct
+  progressions, one I–V–vi–IV shape transposed into six keys, so 71 unrelated
+  titles carried an identical chart. That is precisely what AI-NOTES forbids:
+  a made-up progression looks exactly like one somebody checked.
+- **What is there now:** `Tekst još uvijek nije ažuriran.`, `chords: []`, and the
+  `bez-akorda` tag so these sit with every other untranscribed title rather than
+  in a category of their own.
+- **Songs carry no history, so this cannot be undone from the database.** The
+  script wrote a JSON copy of every sheet it overwrote to
+  `scripts/demo-lyrics-backup-<timestamp>.json` first. Keep it until the songs
+  are genuinely written up.
+- **A sheet with no chord is no longer locked.** Without that the placeholder
+  came out as "xxxxx xxx xxxxxx xxxx xxxxxxxx." and the page offered to sell
+  what was behind it — which was nothing. `worthLocking()` decides this.
+- **Catalogue after:** 1569 published — 833 with real chords, 594 waiting for a
+  transcription, 142 with none.
+- **Files:** `scripts/clear-demo-lyrics.js`, `controllers/songController.js`,
+  `test/subscription.test.js`.
+
+### 2026-08-30 — The wall asks for an account, not a payment (for now)
+
+- **Setting, not an edit:** `PAYWALL_REQUIRES` is `account` (the default) or
+  `subscription`. Mirnes chose `account` because payments are not designed yet —
+  signing in is the whole price. When there is something to sell it becomes
+  `subscription` in the environment, with no code change.
+- **Why a flag rather than deleting the subscription check:** the subscription
+  path is the intended end state. Ripped out now, it would have to be rebuilt
+  and re-reasoned later; left behind a flag, it stays covered by tests that flip
+  the setting, so it cannot rot while it is switched off.
+- **`requireSubscription` answers 401, not 402, while the wall asks for an
+  account.** 402 means payment is what is missing — naming a price that does not
+  exist would be a lie the client then has to render.
+- **Staff still bypass everything.** An editor checking a song they are about to
+  publish is not a customer.
+- **The four states, measured on a running server:** signed out → mask;
+  signed in → real content; signed in with a subscription → real content; staff
+  → real content. Under `subscription` the second becomes a mask again.
+- **Files:** `middleware/subscription.js`, `test/subscription.test.js`, `.env.dev`.
+
+### 2026-08-30 — A locked sheet carries nothing readable, and that is final
+
+- **The rule, from Mirnes, in his words:** the backend does not deliver text or
+  chords to a visitor who is not signed in. The front end is never what hides
+  it — that is not security. The backend may send the *shape*: chords as `[X]`,
+  every letter as `x`. "Mujo kuje a majka ga kune" leaves as
+  "xxxx xxxx x xxxxx xx xxxx". The blur on the page is decoration on top.
+- **This reversed a lead-in shipped the day before.** That version served the
+  first verse intact so Google had something to index — it worked, and it was
+  removed anyway, because it meant real chords reaching somebody who had not
+  paid. The cost was stated before the change and taken knowingly: the catalogue
+  is no longer findable through its own words.
+- **`x`, not plausible filler.** The earlier mask substituted vowels and
+  consonants, so under a blur it still read like a lyric sheet somebody might
+  make out. That ambiguity was the point of failure; a literal x is obviously
+  withheld and obviously not recoverable.
+- **Section markers stay legible.** They are structure, not content — a sheet
+  whose sections are unreadable helps nobody and protects nothing. maskChords
+  turns chords into `[X]` first, so whatever is left in brackets is a marker.
+- **Still sent while locked, deliberately:** title, `originalKey`, `capo`,
+  `difficulty`, ratings. None of them is a lyric or a chart, and the meta
+  description, the share image and the transpose control are all built from
+  them. Revisit only if Mirnes says the key itself is too much.
+- **Files:** `controllers/songController.js`, `test/subscription.test.js`.
+
+### 2026-08-29 — The dashboard session is 60 minutes, idle-based
+
+- **Choice:** staff tokens are issued for 60 minutes (`STAFF_SESSION_MINUTES`,
+  default 60) instead of the 7 days everything used to get. The client renews
+  them while somebody is working, via `POST /auth/staff/renew`.
+- **Why:** a reader losing a session is an inconvenience; a dashboard session
+  left open on an unattended laptop is somebody else's access to the catalogue.
+  Seven days with the token in `localStorage` meant any XSS bought a week.
+- **Renewal, not sliding expiry.** Sliding would let *any* request push the
+  deadline out, so a script polling in a forgotten tab would keep a session
+  alive forever — exactly what a short session is for. Renewal is deliberate:
+  the client asks, and only asks because somebody acted.
+- **The public site keeps its long session.** `issueUserSession` is untouched,
+  and a test asserts a reader's token is still longer than an hour — signing
+  readers out hourly would be a regression dressed up as a security fix.
+- **Cookie and token expire together.** A cookie outliving its token leaves a
+  browser sending credentials that can only ever be refused.
+- **Renewal cannot resurrect.** It sits behind `requireStaff`, so an expired
+  token, a deleted account and a deactivated one are all refused first —
+  deactivation stays the instant kill switch. Both are covered by tests.
+- **Files:** `utils/session.js`, `controllers/authController.js`,
+  `routes/auth.js`, `test/staffSession.test.js`.
+
+### 2026-08-29 — Editorial accounts are created over the API, by a superadmin
+
+- **Choice:** `POST /accounts/staff` creates a Staff account. Superadmin-only
+  (the whole `accounts` router is), Zod-validated, audit-logged as
+  `create/staff`, and it answers with the exact shape `listStaff` returns so the
+  dashboard can take the row as it is.
+- **Why:** creation had no API at all — `scripts/createAdmin.js` was the only
+  path, and it needs a shell on the server. That made handing somebody a login
+  an operations task, and it left no audit trail of who was given what.
+- **Password minimum is 12 here, not the 8 used everywhere else.** Deliberate,
+  and only on this door: a public account can lose one reader's playlists, a
+  Staff account can empty the catalogue. Existing accounts are untouched — this
+  is a guard, not a migration.
+- **Not emailed, by choice.** Mail does work (`MAIL_PROVIDER=resend`), so an
+  invite link is buildable — this is a decision, not a missing dependency. A
+  first login somebody can be walked through beats a link that expires, lands in
+  spam, or gets forwarded. The password is a starting one: `/auth/forgot`
+  already covers the staff realm, so the holder can replace it themselves.
+- **Rejected:** a fourth "moderator" rank. `requireRole` asks for a *minimum*, so
+  inserting a rank between `worker` and `admin` shifts the meaning of every gate
+  above it. Comment moderation already sits at `admin`, so a moderator is an
+  admin. Revisit only if moderation must be split from deletion.
+- **Files:** `controllers/accountController.js`, `routes/accounts.js`,
+  `middleware/schemas.js`, `scripts/createAdmin.js` (marked bootstrap-only),
+  `test/staffCreate.test.js`.
+
 ### 2026-08-29 — A path for authored songs, and the gate that stands in front of it
 - **What:** `scripts/seed/authored.js` (his lyrics and chords) plus
   `scripts/seed/load-authored.js`, which is **dry by default** and needs
@@ -301,6 +449,37 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
   the stored Latin one; the schema hook then converted it on create.
 - **Fix:** the conversion happens before the query.
 - **Files:** `models/Artist.js`.
+
+### A screen that loads 125 images spends the public rate limit on itself
+
+- **Symptom:** the dashboard artist grid 429'd partway down, and the *next*
+  write — saving an edited artist — was refused too, with no message shown.
+- **Cause:** `publicLimiter` is 120/min per address, sized for search. One load
+  of the grid is ~126 requests, because every portrait is its own GET.
+- **Fix:** `imageLimiter` (600/min) mounted on `/artists/:identifier/image`
+  ahead of the general one, and `publicLimiter` now skips stored-image GETs.
+  They are a blob read straight off the document, already sent with a day of
+  `Cache-Control` and an ETag — not the expensive thing that ceiling guards.
+- **Also:** `toCard()` now returns `imageUpdatedAt`, so a client can build an
+  image URL that is stable across visits. The dashboard was keying on a
+  mount-time timestamp, which defeated the cache entirely.
+- **Files:** `middleware/rateLimit.js`, `app.js`, `models/Artist.js`.
+
+### A `.strict()` query schema is part of the endpoint's contract
+
+- **Symptom:** `/songs/search` returned 400 for every dashboard query, with
+  "Nepoznat parametar: page".
+- **Cause:** `search` has always paged — it calls `readPaging` and returns
+  `pageMeta` — but `songSearchQuery` listed only `q` and `limit`, and `.strict()`
+  rejects anything else. The controller and its schema had drifted apart, and
+  the error named the parameter rather than the mismatch.
+- **Fix:** `page` added to the schema. The limit deliberately stays lower than
+  the shared `pagination` helper's: this endpoint also feeds the site's
+  suggestion drop-down, where a hundred rows would be the wrong answer.
+- **Rule:** adding a `req.query` read to a validated handler means editing the
+  schema in the same change. `.strict()` is worth keeping — it catches `?limt=5`
+  — but only if the two are edited together.
+- **Files:** `middleware/schemas.js`, `controllers/songController.js`.
 
 ### A rate limiter mounted at app level cannot key on the account
 - **Symptom:** none — this is why `staffLimiter` keys by address while

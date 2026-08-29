@@ -43,7 +43,14 @@ export const signChallenge = (subject) =>
 
 /** Verifies signature, expiry and realm. A mismatched realm is a rejection. */
 export function verifyToken(token, expectedRealm) {
-  const payload = jwt.verify(token, secret());
+  /*
+   * AI-DECISION: the algorithm is pinned rather than inferred. jsonwebtoken
+   * already refuses `alg: none` for a string secret, so this changes nothing
+   * today — it removes the possibility that a future version, or a key that
+   * stops being a plain string, quietly widens what counts as a valid
+   * signature. A token is trusted on the strength of this line.
+   */
+  const payload = jwt.verify(token, secret(), { algorithms: ['HS256'] });
 
   if (expectedRealm && payload.realm !== expectedRealm) {
     throw new Error('Token realm mismatch');

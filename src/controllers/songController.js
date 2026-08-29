@@ -9,6 +9,7 @@ import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
 import { isChord } from '../utils/chords.js';
 import { visibilityFilter } from '../utils/visibility.js';
+import { detachSongs } from '../utils/songCleanup.js';
 import { mayReadPaid, paywallOn } from '../middleware/subscription.js';
 import { scoreMatch } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
@@ -310,7 +311,7 @@ function maskChords(content) {
      * isChord is the same test the parser and the diagrams use, so what is
      * hidden here is precisely what would otherwise have been drawn as a chord.
      */
-    return isChord(inner) ? '[' + '·'.repeat(Math.max(1, inner.length)) + ']' : whole;
+    return isChord(inner) ? '[X]' : whole;
   });
 }
 
@@ -331,11 +332,58 @@ function maskChords(content) {
  * for a song by a line they remember will no longer find it here. That is a
  * product decision, made deliberately; see AI-NOTES.md.
  */
-const FILLER = 'aeiounrstlmkvpdjbczgh';
-
+/**
+ * The words, replaced by x, keeping only the shape of the verse.
+ *
+ * AI-DECISION: letters become a literal x rather than plausible filler. An
+ * earlier version substituted vowels and consonants so the result still read
+ * like words — under a blur it looked like a lyric sheet somebody might yet
+ * make out, and that ambiguity is the problem. "Mujo kuje a majka ga kune"
+ * leaves as "xxxx xxxx x xxxxx xx xxxx": obviously withheld, obviously not
+ * recoverable.
+ *
+ * AI-TRAP: substituted on the server, over the whole sheet, every time. Sending
+ * real text and hiding it in CSS leaves the words in the DOM for anyone who
+ * opens the inspector — that is a curtain, not a lock. The blur on the page is
+ * decoration over content that has already gone; the front end is never what
+ * protects this.
+ *
+ * Word lengths, line breaks and punctuation survive, so the page can still show
+ * that a real song is there, sized like one.
+ */
 function maskLyrics(text) {
-  let i = 0;
-  return String(text || '').replace(/\p{L}/gu, () => FILLER[i++ % FILLER.length]);
+  /*
+   * Bracketed groups are skipped: maskChords ran first and already turned every
+   * chord into [X], so what is left in brackets is section markers — structure,
+   * not content. A sheet whose sections are unreadable helps nobody and
+   * protects nothing.
+   */
+  return String(text || '').replace(/\[[^\]]*\]|\p{L}/gu, (match) =>
+    (match.startsWith('[') ? match : 'x'));
+}
+
+/**
+ * A locked sheet carries no readable chord and no readable word.
+ *
+ * AI-DECISION: this replaced a lead-in that served the first verse intact. The
+ * lead-in existed to give search engines something to index, and it did — but
+ * it also meant real chords reaching somebody who had not paid, which is the
+ * line Mirnes drew: the backend does not deliver text or chords to a visitor
+ * who is not signed in, full stop. The cost, taken knowingly, is that the
+ * catalogue is no longer findable through its own words.
+ */
+/**
+ * Is there anything on this sheet worth withholding?
+ *
+ * AI-DECISION: a sheet with no chord on it is not paid content. 594 songs carry
+ * only "Tekst još uvijek nije ažuriran." while they wait to be written up, and
+ * without this the mask turned that sentence into "xxxxx xxx xxxxxx xxxx
+ * xxxxxxxx." and the page then offered to sell what was behind it — which was
+ * nothing. Locking an empty sheet costs a sign-up and delivers no chords.
+ */
+function worthLocking(content) {
+  const brackets = String(content || '').match(/\[([^\]]*)\]/g) || [];
+  return brackets.some((b) => isChord(b.slice(1, -1)));
 }
 
 function lockContent(song) {
@@ -363,9 +411,28 @@ export async function getOne(req, res, next) {
     // Fire-and-forget: a failed counter must never fail the page.
     Song.updateOne({ _id: song._id }, { $inc: { views: 1 } }).catch(() => {});
 
+    /*
+     * This body depends on who asked — a subscriber gets the chart, everybody
+     * else gets the mask — and nothing upstream can tell the two apart from the
+     * URL alone. Without this a CDN in front of the API would cache one
+     * subscriber's unlocked sheet and hand it to every anonymous visitor after
+     * them, which is the paywall gone entirely. Vary alone is not enough: a
+     * cache that ignores it would still be wrong, so the answer is simply never
+     * stored.
+     *
+     * AI-TRAP: this only ever fails in production, behind infrastructure that
+     * does not exist in dev. Do not remove it because "nothing caches this".
+     */
+    res.set({
+      'Cache-Control': 'private, no-store',
+      Vary: 'Origin, Authorization, Cookie'
+    });
+
     const shaped = song.toPublic(req.query.arrangement, { withContent: true });
     res.json({
-      song: mayReadPaid(req) ? { ...shaped, locked: false } : lockContent(shaped),
+      song: (mayReadPaid(req) || !worthLocking(shaped.content))
+        ? { ...shaped, locked: false }
+        : lockContent(shaped),
       paywall: paywallOn()
     });
   } catch (err) {
@@ -611,8 +678,15 @@ export async function purge(req, res, next) {
       return res.status(409).json({ message: 'Prvo obriši pjesmu, pa je onda možeš trajno ukloniti.' });
     }
 
-    await Rating.deleteMany({ song: song._id });
-    await Review.deleteMany({ song: song._id });
+    /*
+     * AI-TRAP: this used to delete ratings and reviews and stop there, leaving
+     * the song's comments, reports, notifications and fingerprint pointing at
+     * an id that no longer resolves. Emptying the trash cleaned all six, so the
+     * same act left different wreckage depending on which button was pressed.
+     * Both go through detachSongs now; adding a collection in one place is what
+     * makes it true in the other.
+     */
+    await detachSongs([song._id]);
     await song.deleteOne();
 
     // The label is the only thing left once the document is gone, which is

@@ -1,5 +1,11 @@
 /**
- * Creates the first editorial admin, or promotes an existing Staff account.
+ * Creates the FIRST editorial admin, or promotes an existing Staff account.
+ *
+ * AI-NOTE: bootstrap only. Since accounts can be created from the dashboard
+ * (Nalozi => Uredništvo => Novi nalog, superadmin only), this script exists for
+ * the one case that screen cannot cover: there is no superadmin yet, so there
+ * is nobody who could open it. Everyday accounts go through the dashboard,
+ * where they are written to the audit log — this path leaves no trace.
  *
  * Editorial accounts live in the Staff collection, separate from public site
  * accounts. Creating one here can never touch a reader's account.

@@ -146,6 +146,92 @@ export async function listStaff(req, res, next) {
   }
 }
 
+/**
+ * Minimum for a new editorial account.
+ *
+ * Higher than the 8 the public site asks for, and deliberately so: a reader's
+ * account can lose that reader's own playlists, while a dashboard account can
+ * empty the catalogue. Existing accounts are left alone — this guards the door,
+ * it is not a migration.
+ */
+const MIN_STAFF_PASSWORD = 12;
+
+/**
+ * Creates an editorial account.
+ *
+ * AI-DECISION: this is the only way a dashboard login comes into existence.
+ * Before it there was just `scripts/createAdmin.js`, which meant shell access on
+ * the server, so in practice nobody but Mirnes could ever be given a login.
+ * Public registration writes to User and cannot reach this collection at all
+ * (see the note at the top of models/Staff.js), so creation had to become a
+ * superadmin act rather than a second signup route.
+ *
+ * The password is set here and handed over out of band rather than emailed.
+ * Mail does work (MAIL_PROVIDER=resend), so an invite link is buildable — this
+ * is a choice, not a limitation: a first login somebody can be walked through
+ * beats a link that can expire, land in spam, or be forwarded. It is meant as a
+ * starting password. Whoever receives it can set their own through the ordinary
+ * forgot-password flow, which already covers the staff realm.
+ */
+export async function createStaff(req, res, next) {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    const name = String(req.body.name || '').trim();
+    const { role, password } = req.body;
+
+    if (!ROLE_RANK[role]) return res.status(400).json({ message: 'Nepoznata uloga.' });
+    if (name.length < 2 || name.length > 60) {
+      return res.status(400).json({ message: 'Ime mora imati između 2 i 60 znakova.' });
+    }
+    if (String(password || '').length < MIN_STAFF_PASSWORD) {
+      return res.status(400).json({
+        message: `Lozinka mora imati najmanje ${MIN_STAFF_PASSWORD} znakova.`
+      });
+    }
+
+    // Checked before writing so the caller gets a sentence rather than a
+    // duplicate-key error from the unique index.
+    if (await Staff.exists({ email })) {
+      return res.status(409).json({ message: 'Nalog s tom adresom već postoji.' });
+    }
+
+    const created = await Staff.create({
+      email,
+      name,
+      role,
+      passwordHash: await Staff.hashPassword(password)
+    });
+
+    // Creating a colleague outranks every other entry on the desk: it is the
+    // one action that adds somebody who can act on everything else.
+    await AuditLog.record({
+      req,
+      action: 'create',
+      entity: 'staff',
+      entityId: created._id,
+      entityLabel: created.email,
+      changes: [{ field: 'role', from: null, to: created.role }]
+    });
+
+    // Same shape listStaff returns, so the table can take the row as it is.
+    res.status(201).json({
+      staff: {
+        _id: created._id,
+        email: created.email,
+        name: created.name,
+        role: created.role,
+        active: created.active,
+        totpEnabled: created.totpEnabled,
+        createdAt: created.createdAt,
+        lastLoginAt: null,
+        isSelf: false
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateStaff(req, res, next) {
   try {
     const { role, active } = req.body;

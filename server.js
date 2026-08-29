@@ -8,20 +8,33 @@
  */
 import { env } from './src/config/env.js';
 
+import http from 'node:http';
 import mongoose from 'mongoose';
 import app from './src/app.js';
 import { connectDB } from './src/config/db.js';
+import { initChat } from './src/realtime/chat.js';
 
 const PORT = env.PORT;
 
 console.log(`✓ Okruženje: ${env.NODE_ENV}${env.envFile ? ` (${env.envFile})` : ' (bez .env fajla)'}`);
 
 let server;
+let io;
 
 try {
   // Connect before listening, so the first request never races the database.
   await connectDB();
-  server = app.listen(PORT, () => {
+
+  /*
+   * The HTTP server is built here rather than by app.listen(), because the
+   * chat needs something to attach to. app.listen() creates one and keeps it,
+   * leaving no handle for socket.io — and no handle for the shutdown below to
+   * close either.
+   */
+  server = http.createServer(app);
+  io = initChat(server);
+
+  server.listen(PORT, () => {
     console.log(`✓ Octava backend na http://localhost:${PORT}`);
   });
 } catch (err) {
@@ -49,6 +62,14 @@ async function shutdown(signal) {
   }, SHUTDOWN_TIMEOUT_MS);
 
   try {
+    /*
+     * AI-TRAP: the chat has to be closed first, and explicitly. An open socket
+     * is an open connection, so server.close() waits for every one of them —
+     * which for a chat means forever, and every deploy would sit out the ten
+     * second timeout above and then be killed mid-request anyway.
+     */
+    if (io) await io.close();
+
     await new Promise((resolve, reject) =>
       server.close((err) => (err ? reject(err) : resolve()))
     );

@@ -1,0 +1,101 @@
+# Reverse proxy for Octava.
+#
+# Copy, set the two server names, and point the TLS paths at real certificates.
+#
+# The one thing here that is easy to get wrong and hard to notice: the chat's
+# socket needs the connection UPGRADED, and nginx does not do that by default.
+# Without the three headers under /socket.io the handshake still succeeds over
+# long-polling, so the chat appears to work — and then stops, because the
+# upgrade to a websocket is what never happens. It reads as a flaky network.
+
+# Upgrade is a hop-by-hop header: it is either "upgrade" or it must be absent,
+# and hardcoding "upgrade" on a plain request breaks keep-alive for every other
+# route sharing this block.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+upstream octava_api {
+    server 127.0.0.1:4000;
+    keepalive 32;
+}
+
+# ---------------------------------------------------------------- public site
+server {
+    listen 443 ssl http2;
+    server_name octava.example;          # <- the reader-facing domain
+
+    ssl_certificate     /etc/letsencrypt/live/octava.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/octava.example/privkey.pem;
+
+    # Nuxt SSR
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://octava_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ------------------------------------------------------------------- dashboard
+server {
+    listen 443 ssl http2;
+    server_name desk.octava.example;     # <- the staff domain
+
+    ssl_certificate     /etc/letsencrypt/live/desk.octava.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/desk.octava.example/privkey.pem;
+
+    root /var/www/octava-dashboard;      # the built dist/
+    index index.html;
+
+    # A single-page app: every unknown path is a client route, not a 404.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://octava_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # The chat. The three headers below are the entire point of this file.
+    location /socket.io/ {
+        proxy_pass http://octava_api;
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # A websocket is idle whenever nobody is typing. The default 60s read
+        # timeout closes it mid-conversation; socket.io reconnects, so this
+        # shows up as presence flickering rather than as an error.
+        proxy_read_timeout  1h;
+        proxy_send_timeout  1h;
+        proxy_buffering     off;
+    }
+}
+
+# X-Forwarded-For only means anything because the API sets `trust proxy`. If
+# that is ever removed, every request looks like it comes from this machine and
+# the rate limits count the whole internet as one visitor.

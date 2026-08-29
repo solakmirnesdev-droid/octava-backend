@@ -21,6 +21,19 @@ export const paywallOn = () => process.env.PAYWALL_ENABLED === 'true';
 export const paymentsMode = () => process.env.PAYMENTS_MODE || 'simulated';
 
 /**
+ * What the wall actually asks for: 'account' or 'subscription'.
+ *
+ * AI-DECISION: a setting rather than an edit, because the answer is known to be
+ * temporary. Payments are not designed yet, so for now signing in is enough and
+ * the wall exists to make people register. When there is something to sell, this
+ * becomes `subscription` in the environment — no code change, and the
+ * subscription path below stays covered by tests in the meantime so it cannot
+ * rot while it is switched off.
+ */
+export const paywallRequires = () =>
+  (process.env.PAYWALL_REQUIRES === 'subscription' ? 'subscription' : 'account');
+
+/**
  * May this request read paid content?
  *
  * Staff always may: an editor checking a song they are about to publish is not
@@ -29,7 +42,9 @@ export const paymentsMode = () => process.env.PAYMENTS_MODE || 'simulated';
 export function mayReadPaid(req) {
   if (!paywallOn()) return true;
   if (req.staff) return true;
-  return Boolean(req.user?.subscriptionActive?.());
+  if (!req.user) return false;
+  if (paywallRequires() === 'account') return true;
+  return Boolean(req.user.subscriptionActive?.());
 }
 
 /**
@@ -41,8 +56,17 @@ export function mayReadPaid(req) {
  */
 export function requireSubscription(req, res, next) {
   if (mayReadPaid(req)) return next();
-  return res.status(402).json({
-    message: 'Ovaj sadržaj je dio pretplate.',
-    reason: req.user ? 'subscription_required' : 'login_required'
+  /*
+   * 402 only when payment is genuinely what is missing. While the wall asks for
+   * an account, a signed-out visitor is one sign-in away and nothing is for
+   * sale — answering "this is part of a subscription" would name a price that
+   * does not exist.
+   */
+  const needsPayment = req.user && paywallRequires() === 'subscription';
+  return res.status(needsPayment ? 402 : 401).json({
+    message: needsPayment
+      ? 'Ovaj sadržaj je dio pretplate.'
+      : 'Prijavi se da vidiš akorde.',
+    reason: needsPayment ? 'subscription_required' : 'login_required'
   });
 }

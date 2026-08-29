@@ -22,9 +22,23 @@ const passthrough = (_req, _res, next) => next();
 
 const limiter = (options) => (disabled ? passthrough : rateLimit(options));
 
-/** Counts only failures, so a person signing in repeatedly is never punished. */
+/**
+ * Counts only failures, so a person signing in repeatedly is never punished.
+ *
+ * AI-DECISION: the window is an hour rather than fifteen minutes. Ten guesses
+ * per hour per address-and-account is a far tighter ceiling on password
+ * spraying, and the cost of that is carried by whoever gets it wrong ten times
+ * in a row — who now waits an hour rather than a quarter of one.
+ *
+ * AI-TRAP: the counters live in this process's memory, so restarting the API
+ * clears every lockout instantly. That is the way out in development and it is
+ * NOT one in production behind more than one instance, where a locked-out
+ * editor waits the full hour. Lengthening this window without a reset path for
+ * staff is what makes that an hour of nothing to do — see resetController's
+ * `staff` realm, which is the only door left open.
+ */
 export const loginLimiter = limiter({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 60 * 60 * 1000,
   limit: 10,
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-7',
@@ -146,9 +160,33 @@ export const staffLimiter = limiter({
  * make and one of the more expensive to serve. This is a ceiling on volume, set
  * far above what reading the site looks like.
  */
+/**
+ * A stored image, by URL.
+ *
+ * AI-TRAP: the artist grid renders 125 cards, each pulling its own portrait, so
+ * one page load is ~126 requests. Against the 120/min ceiling below that meant
+ * a screen which throttled itself: the images at the bottom 429'd, and so did
+ * the next write — saving an edited artist came back 429 with no explanation.
+ * Images are not what that ceiling protects. They are a stored blob served
+ * straight from the document, already sent with a day of Cache-Control and an
+ * ETag, so they get their own bucket and are skipped by the one below.
+ */
+const isStoredImage = (req) =>
+  req.method === 'GET' && /\/artists\/[^/]+\/image(\?|$)/.test(req.originalUrl);
+
+export const imageLimiter = limiter({
+  windowMs: 60 * 1000,
+  limit: 600,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message,
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
+});
+
 export const publicLimiter = limiter({
   windowMs: 60 * 1000,
   limit: 120,
+  skip: isStoredImage,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message,

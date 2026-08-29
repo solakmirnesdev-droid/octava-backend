@@ -14,8 +14,17 @@ export const songListQuery = pagination.extend({
   tag: text(40).optional()
 }).strict();
 
+/*
+ * AI-TRAP: `page` belongs here even though search feels like a one-shot lookup.
+ * The controller has always paged — it calls readPaging and returns pageMeta —
+ * but this schema is `.strict()`, so the dashboard asking for page 2 got a 400
+ * and the whole search read as broken. The limit stays lower than the shared
+ * `pagination` helper's: this endpoint also feeds the site's suggestion drop-
+ * down, where a hundred rows would be the wrong answer.
+ */
 export const songSearchQuery = z.object({
   q: text(120),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10)
 }).strict();
 
@@ -69,6 +78,15 @@ export const registerBody = z.object({
 
 export const loginBody = z.object({
   email: str(200),
+  password: str(200)
+}).strict();
+
+export const createStaffBody = z.object({
+  email: str(200),
+  name: str(60),
+  // Ranked, so the enum is listed rather than derived: adding a rank should be
+  // a deliberate edit here, not something a new model value enables silently.
+  role: z.enum(['worker', 'admin', 'superadmin']),
   password: str(200)
 }).strict();
 

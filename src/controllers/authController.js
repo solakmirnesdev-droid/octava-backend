@@ -158,6 +158,29 @@ export async function staffMe(req, res) {
  * codes. A used counter is recorded so an observed code cannot be replayed
  * inside its own thirty-second window.
  */
+/**
+ * Extends the dashboard session.
+ *
+ * AI-DECISION: a renewal endpoint rather than a sliding expiry on the server.
+ * Sliding would mean every request quietly pushed the deadline out, so a script
+ * polling in a forgotten tab would keep a session alive forever — the exact
+ * thing a short session is meant to prevent. Renewal is deliberate: the client
+ * asks, and it only asks because somebody is working.
+ *
+ * requireStaff has already refused an expired token, a deleted account and a
+ * deactivated one, so reaching here means the session is still genuinely valid.
+ */
+export async function staffRenew(req, res, next) {
+  try {
+    res.json({
+      token: issueStaffSession(res, req.staff),
+      user: req.staff.toPublic()
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function staffLoginVerify(req, res, next) {
   try {
     const { challenge, code } = req.body;

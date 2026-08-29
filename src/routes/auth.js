@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   register, login, logout, me,
-  staffLogin, staffLoginVerify, staffLogout, staffMe, staffResendEmailCode
+  staffLogin, staffLoginVerify, staffLogout, staffMe, staffRenew, staffResendEmailCode
 } from '../controllers/authController.js';
 import {
   setup, enable, disable, regenerateBackupCodes,
@@ -49,6 +49,12 @@ router.post('/staff/login/verify', twoFactorLimiter, validate({ body: staffVerif
 router.post('/staff/login/resend-code', registerLimiter, validate({ body: challengeBody }), staffResendEmailCode);
 router.post('/staff/logout', staffLogout);
 router.get('/staff/me', requireStaff, staffMe);
+
+/*
+ * Renewal, not a refresh token: it needs a session that is still valid, so it
+ * extends a working day rather than resurrecting an abandoned one.
+ */
+router.post('/staff/renew', requireStaff, staffRenew);
 
 // Second factor management, all behind an existing session.
 router.post('/staff/2fa/setup', requireStaff, setup);

@@ -60,20 +60,32 @@ describe('paywall', () => {
     assert.equal(linesOf(res.body.song.content), 7);
   });
 
-  test('neprijavljen ne dobija ni rijec ni akord, ali dobija oblik pjesme', async () => {
+  /*
+   * The guarantee changed shape in 2026-08: a locked sheet now opens with a
+   * real lead-in and withholds the rest, because masking the whole thing left
+   * Google indexing 1569 pages of dots and filler. What must still hold is that
+   * everything past the lead-in is unreadable — so these assert the seam, which
+   * is the part that can now leak.
+   */
+  /*
+   * The rule, stated plainly: the backend does not deliver text or chords to a
+   * visitor who is not signed in. Not a shortened version, not a first verse —
+   * nothing readable. The blur on the page is decoration; this is the lock.
+   */
+  test('neprijavljen ne dobija nijednu rijec ni akord', async () => {
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`);
-    const content = res.body.song.content;
 
     assert.equal(res.body.song.locked, true);
 
-    // The shape survives: same number of lines, so the page can show a sheet
+    // The shape survives: same number of lines, so the page still shows a sheet
     // that is recognisably a song rather than an empty box.
-    assert.equal(linesOf(content), 7);
+    assert.equal(linesOf(res.body.song.content), 7);
 
-    // Nothing readable does. Asserted against the whole payload, not one field,
-    // because the leak that got past an earlier version of this test was in a
-    // property nobody thought to check.
+    /*
+     * Asserted against the whole payload, not one field: the leak that got past
+     * an earlier version of this test was in a property nobody thought to check.
+     */
     const whole = JSON.stringify(res.body);
     for (const chord of ['[Am]', '[F]', '[C]', '[G]']) {
       assert.ok(!whole.includes(chord), `akord ${chord} je poslan`);
@@ -82,6 +94,68 @@ describe('paywall', () => {
       assert.ok(!whole.includes(word), `rijec "${word}" je poslana`);
     }
     assert.deepEqual(res.body.song.chords, []);
+  });
+
+  test('akordi izlaze kao [X], slova kao x, oblik ostaje', async () => {
+    // Masking rather than omitting is the whole point: word lengths and
+    // punctuation survive, the words do not.
+    const artist = await Artist.create({ name: 'Oblik' });
+    const song = await Song.create({
+      title: 'Mujo', artist: artist._id, status: 'published',
+      arrangements: [{
+        label: 'Osnovna', originalKey: 'Am',
+        content: '[Strofa 1]\n[Am]Mujo kuje a majka ga [Dm]kune'
+      }]
+    });
+
+    const { body } = await api(`/songs/${song.slug}`);
+    const lines = body.song.content.split('\n');
+
+    // Section markers are structure, not content, and stay legible.
+    assert.equal(lines[0], '[Strofa 1]');
+    assert.equal(lines[1], '[X]xxxx xxxx x xxxxx xx [X]xxxx');
+  });
+
+  test('oznaceni list zadrzava sekcije, ali nijednu rijec', async () => {
+    const artist = await Artist.create({ name: 'Oznaceni' });
+    const song = await Song.create({
+      title: 'Sa sekcijama', artist: artist._id, status: 'published',
+      arrangements: [{
+        label: 'Osnovna', originalKey: 'Am',
+        content: [
+          '[Strofa 1]', '[Am]prvi red', '[F]drugi red',
+          '[Refren]', '[G]refren jedan', '[Am]refren dva'
+        ].join('\n')
+      }]
+    });
+
+    const { body } = await api(`/songs/${song.slug}`);
+    const whole = JSON.stringify(body);
+
+    assert.ok(body.song.content.includes('[Strofa 1]'));
+    assert.ok(body.song.content.includes('[Refren]'));
+
+    for (const withheld of ['prvi red', 'drugi red', 'refren jedan', 'refren dva']) {
+      assert.ok(!whole.includes(withheld), `"${withheld}" je poslano`);
+    }
+  });
+
+  test('list bez akorda se ne zakljucava', async () => {
+    /*
+     * 594 songs carry only "Tekst još uvijek nije ažuriran." while they wait to
+     * be written up. Masking that sentence produced "xxxxx xxx xxxxxx xxxx
+     * xxxxxxxx." and the page then offered to sell what was behind it — which
+     * was nothing at all.
+     */
+    const artist = await Artist.create({ name: 'Prazna' });
+    const song = await Song.create({
+      title: 'Ceka tekst', artist: artist._id, status: 'published',
+      arrangements: [{ label: 'Osnovna', originalKey: 'Am', content: 'Tekst još uvijek nije ažuriran.' }]
+    });
+
+    const { body } = await api(`/songs/${song.slug}`);
+    assert.equal(body.song.locked, false);
+    assert.equal(body.song.content, 'Tekst još uvijek nije ažuriran.');
   });
 
   test('pretplatnik dobija tacno ono sto je upisano', async () => {
@@ -98,11 +172,9 @@ describe('paywall', () => {
     assert.ok(res.body.song.chords.length > 0);
   });
 
-  test('akordi se ne salju uz zakljucan tekst', async () => {
-    // Otherwise the chord strip hands over the answer the sheet withholds.
-    // Asserted against the payload as a whole, not one field name: the first
-    // version of this test checked `allChords`, which toPublic() never returns,
-    // so it passed while the real `chords` list went out with every locked sheet.
+  test('strip akorda ne odaje nista', async () => {
+    // Otherwise the strip under the sheet hands over, in a neat list, exactly
+    // what the sheet is hiding — the chords are the product here, not the words.
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`);
 
@@ -115,11 +187,32 @@ describe('paywall', () => {
     }
   });
 
-  test('prijavljen bez pretplate je i dalje zakljucan', async () => {
+  /*
+   * The wall asks for an account, not a payment — PAYWALL_REQUIRES=account,
+   * which is the default and what is running now. Payments are not designed
+   * yet, so signing in is the whole price. The subscription path is still
+   * exercised below, with the setting flipped, so it cannot rot while it is
+   * switched off.
+   */
+  test('prijava je dovoljna dok zid trazi nalog', async () => {
     const token = await reader();
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`, { token });
-    assert.equal(res.body.song.locked, true);
+
+    assert.equal(res.body.song.locked, false);
+    assert.ok(res.body.song.content.includes('[Am]red jedan'));
+    assert.ok(res.body.song.chords.length > 0);
+  });
+
+  test('kad zid trazi pretplatu, sama prijava nije dovoljna', async () => {
+    process.env.PAYWALL_REQUIRES = 'subscription';
+    try {
+      const token = await reader();
+      const slug = await makeSong();
+      assert.equal((await api(`/songs/${slug}`, { token })).body.song.locked, true);
+    } finally {
+      process.env.PAYWALL_REQUIRES = 'account';
+    }
   });
 
   test('pretplacen vidi sve', async () => {
@@ -158,6 +251,8 @@ describe('zivotni vijek pretplate', () => {
   });
 
   test('istekla pretplata vise ne vrijedi, ma sta status kaze', async () => {
+    // Only meaningful while the wall asks for payment.
+    process.env.PAYWALL_REQUIRES = 'subscription';
     const token = await reader();
     await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
 
@@ -167,6 +262,7 @@ describe('zivotni vijek pretplate', () => {
 
     const slug = await makeSong();
     assert.equal((await api(`/songs/${slug}`, { token })).body.song.locked, true);
+    process.env.PAYWALL_REQUIRES = 'account';
   });
 
   test('obnova dodaje na preostalo, ne brise ga', async () => {
@@ -192,6 +288,8 @@ describe('sigurnost simulacije', () => {
   });
 
   test('van simulacije se pretplata ne poklanja', async () => {
+    // Only meaningful while the wall asks for payment.
+    process.env.PAYWALL_REQUIRES = 'subscription';
     process.env.PAYMENTS_MODE = 'disabled';
     const token = await reader();
     const res = await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
@@ -199,6 +297,7 @@ describe('sigurnost simulacije', () => {
 
     const slug = await makeSong();
     assert.equal((await api(`/songs/${slug}`, { token })).body.song.locked, true);
+    process.env.PAYWALL_REQUIRES = 'account';
   });
 
   test('cjenovnik je javan', async () => {

@@ -125,24 +125,59 @@ export async function remove(req, res, next) {
     const artist = await Artist.findOne(byIdOrSlug(req.params.identifier));
     if (!artist) return res.status(404).json({ message: 'Izvođač nije pronađen.' });
 
-    // Deleting an artist with songs would orphan every one of them.
     const songs = await Song.countDocuments({ artist: artist._id });
-    if (songs) {
+
+    /*
+     * Deleting an artist with songs would orphan every one of them, so it is
+     * still refused — unless the caller has said, in the request, that the
+     * songs go too.
+     *
+     * AI-DECISION: opt-in rather than a cascade by default. The refusal is what
+     * stands between a mistyped id and a hundred songs off the site, and it
+     * costs a caller who genuinely means it one query parameter. The count goes
+     * back with the refusal so the interface can say the number out loud
+     * instead of making somebody go and look it up.
+     */
+    const withSongs = req.query.withSongs === '1' || req.query.withSongs === 'true';
+    if (songs && !withSongs) {
       return res.status(409).json({
-        message: `Izvođač ima ${songs} pjesama. Prebaci ih ili obriši prije brisanja izvođača.`
+        message: `Izvođač ima ${songs} pjesama. Prebaci ih ili obriši prije brisanja izvođača.`,
+        songs
       });
     }
 
-    artist.deletedAt = new Date();
+    /*
+     * One timestamp for the artist and every song that went with them.
+     *
+     * AI-TRAP: this is what makes restoring exact. Songs already in the trash
+     * before this delete keep their own, older stamp — the scoped updateMany
+     * below only touches living rows — so restoring the artist brings back what
+     * this act took and leaves everything else where it was. Without a shared
+     * instant there is nothing to tell the two apart.
+     */
+    const when = new Date();
+
+    let buried = 0;
+    if (songs) {
+      const result = await Song.updateMany(
+        { artist: artist._id },
+        { deletedAt: when, deletedBy: req.staff._id }
+      );
+      buried = result.modifiedCount;
+    }
+
+    artist.deletedAt = when;
     artist.deletedBy = req.staff._id;
+    artist.songCount = 0;
     await artist.save();
 
     await AuditLog.record({
       req, action: 'delete', entity: 'artist',
-      entityId: artist._id, entityLabel: artist.name
+      entityId: artist._id, entityLabel: artist.name,
+      meta: buried ? { songs: buried } : undefined
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, songs: buried });
   } catch (err) { next(err); }
 }
 
@@ -172,16 +207,36 @@ export async function restore(req, res, next) {
     if (!artist) return res.status(404).json({ message: 'Izvođač nije pronađen.' });
     if (!artist.deletedAt) return res.status(409).json({ message: 'Izvođač nije obrisan.' });
 
+    // Read before it is cleared: it is the key to the songs that fell with them.
+    const when = artist.deletedAt;
+
     artist.deletedAt = null;
     artist.deletedBy = undefined;
+
+    /*
+     * Songs come back with the artist, and only the ones that went down with
+     * them. Matching on the exact instant leaves anything deleted separately —
+     * before or since — in the trash where somebody deliberately put it.
+     */
+    let revived = 0;
+    if (when) {
+      const result = await Song.updateMany(
+        { artist: artist._id, deletedAt: when },
+        { deletedAt: null, deletedBy: undefined }
+      );
+      revived = result.modifiedCount;
+    }
+
+    artist.songCount = await Song.countDocuments({ artist: artist._id });
     await artist.save();
 
     await AuditLog.record({
       req, action: 'restore', entity: 'artist',
-      entityId: artist._id, entityLabel: artist.name
+      entityId: artist._id, entityLabel: artist.name,
+      meta: revived ? { songs: revived } : undefined
     });
 
-    res.json({ artist: artist.toCard() });
+    res.json({ artist: artist.toCard(), songs: revived });
   } catch (err) { next(err); }
 }
 

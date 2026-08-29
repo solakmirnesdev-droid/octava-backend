@@ -24,8 +24,10 @@ import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import auditRoutes from './routes/audit.js';
 import recognizeRoutes from './routes/recognize.js';
+import trashRoutes from './routes/trash.js';
+import chatRoutes from './routes/chat.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
-import { publicLimiter, staffLimiter } from './middleware/rateLimit.js';
+import { publicLimiter, staffLimiter, imageLimiter } from './middleware/rateLimit.js';
 
 /**
  * Both are optional, and both fail open when unset — which is right for local
@@ -107,6 +109,7 @@ app.get('/api/health/live', (_req, res) => res.json({ status: 'ok' }));
 const api = Router();
 
 api.use('/songs', publicLimiter);
+api.use('/artists/:identifier/image', imageLimiter);
 api.use('/artists', publicLimiter);
 api.use('/genres', publicLimiter);
 api.use('/footer', publicLimiter);
@@ -132,6 +135,8 @@ api.use('/moderation', staffLimiter);
 api.use('/notifications', staffLimiter);
 api.use('/import', staffLimiter);
 api.use('/audit', staffLimiter);
+api.use('/trash', staffLimiter);
+api.use('/chat', staffLimiter);
 
 api.use('/auth', authRoutes);
 api.use('/songs', songRoutes);
@@ -155,6 +160,8 @@ api.use('/notifications', notificationRoutes);
 api.use('/reports', reportRoutes);
 api.use('/audit', auditRoutes);
 api.use('/recognize', recognizeRoutes);
+api.use('/trash', trashRoutes);
+api.use('/chat', chatRoutes);
 
 // Pinned: what a released build on somebody's phone talks to.
 app.use('/api/v1', api);

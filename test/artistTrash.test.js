@@ -137,3 +137,84 @@ describe('izvodjac u korpu', () => {
     assert.equal((await api('/artists/trash', { token: worker })).status, 403);
   });
 });
+
+/**
+ * Deleting an artist takes their songs with them — but only when asked, and
+ * restoring brings back exactly what fell, not everything that has ever been
+ * thrown away.
+ */
+describe('brisanje s pjesmama', () => {
+  const addSong = (token, title, artist) => api('/songs', {
+    method: 'POST', token,
+    body: { title, artist, content: '[Am]tekst', originalKey: 'Am', status: 'published' }
+  });
+
+  test('odbijanje javlja i koliko ih je', async () => {
+    // The interface says the number out loud; it has to come from somewhere.
+    const token = await login('superadmin');
+    await addSong(token, 'Prva', 'Zauzet');
+    await addSong(token, 'Druga', 'Zauzet');
+    const found = await Artist.findOne({ name: 'Zauzet' });
+
+    const res = await api(`/artists/${found._id}`, { method: 'DELETE', token });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.songs, 2);
+  });
+
+  test('withSongs salje i izvodjaca i pjesme u korpu', async () => {
+    const token = await login('superadmin');
+    await addSong(token, 'Prva', 'Zauzet');
+    await addSong(token, 'Druga', 'Zauzet');
+    const found = await Artist.findOne({ name: 'Zauzet' });
+
+    const res = await api(`/artists/${found._id}?withSongs=1`, { method: 'DELETE', token });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.songs, 2);
+
+    const trash = await api('/songs/trash', { token });
+    assert.equal(trash.body.songs.length, 2);
+    assert.equal((await api('/songs', { token })).body.songs.length, 0);
+  });
+
+  test('vracanje izvodjaca vraca i njegove pjesme', async () => {
+    const token = await login('superadmin');
+    await addSong(token, 'Prva', 'Zauzet');
+    const found = await Artist.findOne({ name: 'Zauzet' });
+
+    await api(`/artists/${found._id}?withSongs=1`, { method: 'DELETE', token });
+    const back = await api(`/artists/${found._id}/restore`, { method: 'POST', token });
+
+    assert.equal(back.body.songs, 1);
+    assert.equal((await api('/songs', { token })).body.songs.length, 1);
+  });
+
+  /**
+   * AI-TRAP: the reason the delete stamps one instant across artist and songs.
+   * Without it, restoring an artist resurrects every song of theirs that anyone
+   * ever deleted, including the ones somebody removed on purpose months ago.
+   */
+  test('vracanje ne ozivljava pjesmu obrisanu ranije i zasebno', async () => {
+    const token = await login('superadmin');
+    await addSong(token, 'Ostaje u korpi', 'Zauzet');
+    await addSong(token, 'Pada s njim', 'Zauzet');
+
+    const earlier = (await api('/songs', { token })).body.songs
+      .find((x) => x.title === 'Ostaje u korpi');
+    await api(`/songs/${earlier._id}`, { method: 'DELETE', token });
+
+    const found = await Artist.findOne({ name: 'Zauzet' });
+    await api(`/artists/${found._id}?withSongs=1`, { method: 'DELETE', token });
+    await api(`/artists/${found._id}/restore`, { method: 'POST', token });
+
+    const alive = (await api('/songs', { token })).body.songs.map((x) => x.title);
+    assert.deepEqual(alive, ['Pada s njim']);
+  });
+
+  test('izvodjac bez pjesama se i dalje brise bez zastavice', async () => {
+    const token = await login('superadmin');
+    await makeArtist(token, 'Prazan');
+    const found = await Artist.findOne({ name: 'Prazan' });
+
+    assert.equal((await api(`/artists/${found._id}`, { method: 'DELETE', token })).status, 200);
+  });
+});

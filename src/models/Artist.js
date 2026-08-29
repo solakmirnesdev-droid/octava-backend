@@ -201,6 +201,7 @@ artistSchema.methods.toCard = function toCard() {
     country: this.country || null,
     flag: this.flag(),
     hasImage: Boolean(this.imageBytes),
+    imageUpdatedAt: this.imageUpdatedAt || null,
     imageAuthor: this.imageAuthor || null,
     imageLicense: this.imageLicense || null,
     imageSource: this.imageSource || null,
