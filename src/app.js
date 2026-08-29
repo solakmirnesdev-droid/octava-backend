@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Router } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,6 +11,8 @@ import genreRoutes from './routes/genres.js';
 import importRoutes from './routes/import.js';
 import requestRoutes from './routes/requests.js';
 import footerRoutes from './routes/footer.js';
+import versionRoutes from './routes/version.js';
+import planRoutes from './routes/plans.js';
 import statsRoutes from './routes/stats.js';
 import accountRoutes from './routes/accounts.js';
 import meRoutes from './routes/me.js';
@@ -21,6 +23,7 @@ import moderationRoutes from './routes/moderation.js';
 import notificationRoutes from './routes/notifications.js';
 import reportRoutes from './routes/reports.js';
 import auditRoutes from './routes/audit.js';
+import recognizeRoutes from './routes/recognize.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { publicLimiter, staffLimiter } from './middleware/rateLimit.js';
 
@@ -87,47 +90,78 @@ app.get('/api/health/live', (_req, res) => res.json({ status: 'ok' }));
  * runs a regex over the catalogue, which makes it the cheapest request to send
  * and one of the more expensive to answer.
  */
-app.use('/api/songs', publicLimiter);
-app.use('/api/artists', publicLimiter);
-app.use('/api/genres', publicLimiter);
-app.use('/api/footer', publicLimiter);
-app.use('/api/stats', publicLimiter);
+/*
+ * The whole API, built once and mounted twice.
+ *
+ * AI-DECISION: /api/v1 exists for clients that ship separately from the server.
+ * A phone app, once installed, is a frozen copy of this API's contract sitting
+ * on somebody's device, and there is no way to make them update. The site and
+ * the dashboard deploy alongside this server and can always speak the newest
+ * shape, so they keep the unversioned path.
+ *
+ * The day something here has to change incompatibly, v1 stays as it is and v2
+ * is mounted beside it. That is only possible if the prefix exists BEFORE the
+ * first release — adding it afterwards is the one change an installed app
+ * cannot survive.
+ */
+const api = Router();
+
+api.use('/songs', publicLimiter);
+api.use('/artists', publicLimiter);
+api.use('/genres', publicLimiter);
+api.use('/footer', publicLimiter);
+api.use('/stats', publicLimiter);
+// Fingerprint matching walks every stored print, so it is nearer in cost to
+// search than to a lookup.
+api.use('/recognize', publicLimiter);
 
 /*
  * Reader-facing routes that were reachable without any ceiling at all: an
  * account, its saved songs, its reviews, its comments, its requests.
  */
-app.use('/api/me', publicLimiter);
-app.use('/api/users', publicLimiter);
-app.use('/api/reviews', publicLimiter);
-app.use('/api/comments', publicLimiter);
-app.use('/api/requests', publicLimiter);
-app.use('/api/reports', publicLimiter);
+api.use('/me', publicLimiter);
+api.use('/users', publicLimiter);
+api.use('/reviews', publicLimiter);
+api.use('/comments', publicLimiter);
+api.use('/requests', publicLimiter);
+api.use('/reports', publicLimiter);
 
 /* The desk. See staffLimiter for why these are not left open. */
-app.use('/api/accounts', staffLimiter);
-app.use('/api/moderation', staffLimiter);
-app.use('/api/notifications', staffLimiter);
-app.use('/api/import', staffLimiter);
-app.use('/api/audit', staffLimiter);
+api.use('/accounts', staffLimiter);
+api.use('/moderation', staffLimiter);
+api.use('/notifications', staffLimiter);
+api.use('/import', staffLimiter);
+api.use('/audit', staffLimiter);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/songs', songRoutes);
-app.use('/api/artists', artistRoutes);
-app.use('/api/genres', genreRoutes);
-app.use('/api/import', importRoutes);
-app.use('/api/requests', requestRoutes);
-app.use('/api/footer', footerRoutes);
-app.use('/api/stats', statsRoutes);
-app.use('/api/accounts', accountRoutes);
-app.use('/api/me', meRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/comments', commentRoutes);
-app.use('/api/moderation', moderationRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/audit', auditRoutes);
+api.use('/auth', authRoutes);
+api.use('/songs', songRoutes);
+api.use('/artists', artistRoutes);
+api.use('/genres', genreRoutes);
+api.use('/import', importRoutes);
+api.use('/requests', requestRoutes);
+api.use('/footer', footerRoutes);
+// No limiter: a client asking whether it may still run must always get an
+// answer, including — especially — when something is wrong.
+api.use('/version', versionRoutes);
+api.use('/plans', planRoutes);
+api.use('/stats', statsRoutes);
+api.use('/accounts', accountRoutes);
+api.use('/me', meRoutes);
+api.use('/users', userRoutes);
+api.use('/reviews', reviewRoutes);
+api.use('/comments', commentRoutes);
+api.use('/moderation', moderationRoutes);
+api.use('/notifications', notificationRoutes);
+api.use('/reports', reportRoutes);
+api.use('/audit', auditRoutes);
+api.use('/recognize', recognizeRoutes);
+
+// Pinned: what a released build on somebody's phone talks to.
+app.use('/api/v1', api);
+// Unversioned: the site and the dashboard ship with this server, so they always
+// get the current shape. Keep this pointing at the newest version.
+app.use('/api', api);
+
 
 app.use(notFound);
 app.use(errorHandler);

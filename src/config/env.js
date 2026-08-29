@@ -49,6 +49,16 @@ const schema = z.object({
   CORS_ORIGIN: z.string().optional(),
   APP_URL: z.string().url().optional(),
 
+  /*
+   * How a subscription is paid for.
+   *
+   * 'simulated' hands out access on request, with no money involved — usable
+   * while a provider is being chosen, and refused in production below.
+   */
+  PAYMENTS_MODE: z.enum(['simulated', 'disabled']).default('simulated'),
+  /** With the gate off, every song reads as it always did. */
+  PAYWALL_ENABLED: z.enum(['true', 'false']).default('false'),
+
   MAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   MAIL_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().optional(),
@@ -81,6 +91,14 @@ if (value.NODE_ENV === 'production') {
   if (value.JWT_SECRET.length < 32) fatal.push('JWT_SECRET mora imati bar 32 znaka u produkciji.');
   if (!value.CORS_ORIGIN) fatal.push('CORS_ORIGIN mora biti postavljen u produkciji.');
   if (value.MAIL_PROVIDER === 'console') fatal.push('MAIL_PROVIDER=console u produkciji ne šalje poštu.');
+  /*
+   * AI-TRAP: this one is not a warning. PAYMENTS_MODE=simulated exposes an
+   * endpoint that grants a paid subscription to anybody who asks for it — left
+   * on in production it is not a misconfiguration, it is a way in.
+   */
+  if (value.PAYMENTS_MODE === 'simulated') {
+    fatal.push('PAYMENTS_MODE=simulated u produkciji poklanja pretplatu svakome ko je zatraži.');
+  }
   if (fatal.length) { console.error(fatal.map((f) => `  ${f}`).join('\n')); process.exit(1); }
 
   // Warnings, not failures: the site works without these, just with less.

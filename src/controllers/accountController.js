@@ -31,6 +31,15 @@ export async function listUsers(req, res, next) {
     if (req.query.filter === 'active') {
       filter.lastLoginAt = { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
     }
+    /*
+     * Paying, by the only definition that matters: the period they bought has
+     * not run out. Status alone would list somebody who cancelled months ago
+     * and miss somebody whose renewal failed this morning.
+     */
+    if (req.query.filter === 'subscribed') {
+      filter['subscription.expiresAt'] = { $gt: new Date() };
+      filter['subscription.status'] = { $in: ['active', 'cancelled'] };
+    }
 
     const sort = req.query.sort === 'lastLogin'
       ? { lastLoginAt: -1 }
@@ -52,9 +61,36 @@ export async function listUsers(req, res, next) {
                   1, 0
                 ]
               }
+            },
+            // The number a paid product is actually run on. Expiry is the test, not
+            // status: a cancelled subscription is still paid for until its period
+            // ends, and an "active" one whose date has passed is not.
+            subscribed: {
+              $sum: {
+                $cond: [
+                  { $and: [
+                    { $gt: ['$subscription.expiresAt', new Date()] },
+                    { $in: ['$subscription.status', ['active', 'cancelled']] }
+                  ] },
+                  1, 0
+                ]
+              }
+            },
+            // Counted apart, because somebody inside a period they already cancelled
+            // is leaving — and that is worth seeing before they are gone.
+            cancelling: {
+              $sum: {
+                $cond: [
+                  { $and: [
+                    { $gt: ['$subscription.expiresAt', new Date()] },
+                    { $eq: ['$subscription.status', 'cancelled'] }
+                  ] },
+                  1, 0
+                ]
+              }
+            }
             }
           }
-        }
       ])
     ]);
 
@@ -65,9 +101,21 @@ export async function listUsers(req, res, next) {
         username: u.username,
         createdAt: u.createdAt,
         lastLoginAt: u.lastLoginAt || null,
-        savedCount: u.favorites?.length || 0
+        savedCount: u.favorites?.length || 0,
+        /*
+         * Read through the model method, not off the raw fields. A cancelled
+         * subscription is still valid until its date passes, and an active one
+         * whose date has gone is not — a dashboard showing `status` alone would
+         * disagree with what the reader actually experiences.
+         */
+        subscription: {
+          status: u.subscription?.status || 'none',
+          plan: u.subscription?.plan || null,
+          expiresAt: u.subscription?.expiresAt || null,
+          active: u.subscriptionActive()
+        }
       })),
-      stats: stats[0] || { total: 0, everSignedIn: 0, activeThisMonth: 0 },
+      stats: stats[0] || { total: 0, everSignedIn: 0, activeThisMonth: 0, subscribed: 0, cancelling: 0 },
       meta: pageMeta(total, paging)
     });
   } catch (err) {
@@ -144,4 +192,51 @@ export async function updateStaff(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Gives a reader a subscription by hand.
+ *
+ * AI-DECISION: this exists for the support case that always turns up — money
+ * left somebody's account and never reached ours, and they are sitting in front
+ * of a paywall holding a receipt. Without it the only remedy is editing the
+ * database directly, which is the one kind of change the audit log cannot see.
+ *
+ * AI-TRAP: it is written to the audit log deliberately and by name. An endpoint
+ * that hands out paid access is exactly the endpoint somebody will one day be
+ * asked to explain, and "an admin did it, at this time, for this account, for
+ * this long" is the difference between an answer and a shrug.
+ *
+ * Extends rather than replaces, for the same reason a renewal does: nobody
+ * should lose days they already have because somebody helped them.
+ */
+export async function grantSubscription(req, res, next) {
+  try {
+    const days = Number(req.body?.days);
+    if (!Number.isInteger(days) || days < 1 || days > 400) {
+      return res.status(400).json({ message: 'Broj dana mora biti između 1 i 400.' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Nalog nije pronađen.' });
+
+    const from = user.subscriptionActive() ? user.subscription.expiresAt : new Date();
+    user.subscription = {
+      status: 'active',
+      plan: user.subscription?.plan || 'monthly',
+      startedAt: user.subscription?.startedAt || new Date(),
+      expiresAt: new Date(from.getTime() + days * 24 * 60 * 60 * 1000),
+      cancelledAt: null,
+      source: 'staff'
+    };
+    await user.save();
+
+    await AuditLog.record({
+      req, action: 'update', entity: 'user',
+      entityId: user._id, entityLabel: user.email,
+      changes: [{ field: 'subscription', from: 'ručno dodano', to: `+${days} dana` }]
+    });
+
+    res.json({ subscription: user.toPublic().subscription });
+  } catch (err) { next(err); }
 }

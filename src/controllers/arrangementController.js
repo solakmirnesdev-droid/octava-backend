@@ -80,7 +80,7 @@ export async function add(req, res, next) {
     await song.save();
 
     await record(req, song, song.arrangements[song.arrangements.length - 1], 'create');
-    res.status(201).json({ song: song.toPublic() });
+    res.status(201).json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) { next(err); }
 }
 
@@ -102,7 +102,7 @@ export async function update(req, res, next) {
     await song.save();
 
     if (changes.length) await record(req, song, arrangement, 'update', changes);
-    res.json({ song: song.toPublic() });
+    res.json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) { next(err); }
 }
 
@@ -121,7 +121,7 @@ export async function setPrimary(req, res, next) {
     await song.save();
 
     await record(req, song, target, 'setPrimary');
-    res.json({ song: song.toPublic() });
+    res.json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) { next(err); }
 }
 
@@ -162,7 +162,7 @@ export async function remove(req, res, next) {
     // The ratings stay. They belong to this version and are what makes it
     // worth getting back.
     await record(req, song, target, 'delete');
-    res.json({ song: song.toPublic() });
+    res.json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) { next(err); }
 }
 
@@ -188,7 +188,7 @@ export async function restore(req, res, next) {
     await song.save();
 
     await record(req, song, target, 'restore');
-    res.json({ song: song.toPublic() });
+    res.json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) { next(err); }
 }
 

@@ -9,6 +9,9 @@ import {
   uploadAvatar, deleteAvatar
 } from '../controllers/profileController.js';
 import { requireUser } from '../middleware/auth.js';
+import {
+  listPlans, mySubscription, simulateSubscribe, cancelSubscription
+} from '../controllers/subscriptionController.js';
 import { contentLimiter } from '../middleware/rateLimit.js';
 import { MAX_PORTRAIT_BYTES } from '../utils/webp.js';
 
@@ -41,5 +44,11 @@ router.delete('/favorites/:songId', removeFavorite);
 router.get('/artists', listFavoriteArtists);
 router.post('/artists/:artistId', addFavoriteArtist);
 router.delete('/artists/:artistId', removeFavoriteArtist);
+
+// Subscriptions. The plan list is public — a price nobody can read is not a
+// price — while everything that changes an account needs the account.
+router.get('/subscription', requireUser, mySubscription);
+router.post('/subscription', requireUser, simulateSubscribe);
+router.delete('/subscription', requireUser, cancelSubscription);
 
 export default router;

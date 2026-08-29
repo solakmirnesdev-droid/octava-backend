@@ -7,7 +7,9 @@ import Rating from '../models/Rating.js';
 import Review from '../models/Review.js';
 import { readPaging, pageMeta } from '../utils/pagination.js';
 import { slugify } from '../utils/slug.js';
+import { isChord } from '../utils/chords.js';
 import { visibilityFilter } from '../utils/visibility.js';
+import { mayReadPaid, paywallOn } from '../middleware/subscription.js';
 import { scoreMatch } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
 
@@ -278,6 +280,75 @@ export async function search(req, res, next) {
   }
 }
 
+/**
+ * What a reader who has not paid gets: the whole song, without the chords.
+ *
+ * AI-DECISION: the words stay and the chords go, rather than the sheet being cut
+ * off partway. Somebody looking for a song needs to see it really is the one
+ * they meant — and a search engine needs something to index, or the catalogue
+ * cannot be found at all. What is actually being sold here is the chords, so
+ * that is precisely what is withheld.
+ *
+ * AI-TRAP: masked on the server, not dimmed in the page. Sending the real
+ * symbols and blurring them in CSS is not protection — it is the answer,
+ * delivered, with a filter over it. Anyone who opens the network tab has the
+ * chart. Nothing that has not been paid for leaves this process.
+ *
+ * The mask keeps the original length, because in a ChordPro sheet a chord sits
+ * over the syllable it is played on. Collapsing every symbol to one character
+ * would shift the whole line and the preview would misrepresent the sheet.
+ */
+function maskChords(content) {
+  return String(content || '').replace(/\[([^\]]*)\]/g, (whole, inner) => {
+    /*
+     * AI-TRAP: asked positively — "is this a chord?" — not negatively. The first
+     * version masked anything that did not look like prose, and swallowed
+     * [Refren]: one capitalised word with no space, which is exactly the shape a
+     * chord has. Section markers are structure; a sheet whose sections are
+     * unreadable helps nobody and protects nothing.
+     *
+     * isChord is the same test the parser and the diagrams use, so what is
+     * hidden here is precisely what would otherwise have been drawn as a chord.
+     */
+    return isChord(inner) ? '[' + '·'.repeat(Math.max(1, inner.length)) + ']' : whole;
+  });
+}
+
+/**
+ * The words, made unreadable while keeping the shape of the verse.
+ *
+ * AI-DECISION: letters are substituted, not deleted. Word lengths, line breaks
+ * and punctuation stay, so what renders under a blur still looks like a lyric
+ * sheet — the reader sees there is a real song here, sized like one, and cannot
+ * read it. Replacing the text with a grey block would say the same thing far
+ * less honestly.
+ *
+ * AI-TRAP: substituted on the server. Blurring real text in CSS leaves the words
+ * sitting in the DOM for anyone who opens the inspector, which is not a lock —
+ * it is a curtain. Nothing that has not been paid for leaves this process.
+ *
+ * AI-NOTE: this costs the site its lyrics in search results. Somebody looking
+ * for a song by a line they remember will no longer find it here. That is a
+ * product decision, made deliberately; see AI-NOTES.md.
+ */
+const FILLER = 'aeiounrstlmkvpdjbczgh';
+
+function maskLyrics(text) {
+  let i = 0;
+  return String(text || '').replace(/\p{L}/gu, () => FILLER[i++ % FILLER.length]);
+}
+
+function lockContent(song) {
+  return {
+    ...song,
+    content: maskLyrics(maskChords(song.content)),
+    locked: true,
+    // The strip under the sheet is drawn from this; leaving it whole would hand
+    // over, in a neat list, exactly what the sheet is hiding.
+    chords: []
+  };
+}
+
 export async function getOne(req, res, next) {
   try {
     const song = await Song.findOne({
@@ -292,7 +363,11 @@ export async function getOne(req, res, next) {
     // Fire-and-forget: a failed counter must never fail the page.
     Song.updateOne({ _id: song._id }, { $inc: { views: 1 } }).catch(() => {});
 
-    res.json({ song: song.toPublic(req.query.arrangement) });
+    const shaped = song.toPublic(req.query.arrangement, { withContent: true });
+    res.json({
+      song: mayReadPaid(req) ? { ...shaped, locked: false } : lockContent(shaped),
+      paywall: paywallOn()
+    });
   } catch (err) {
     next(err);
   }
@@ -347,7 +422,7 @@ export async function create(req, res, next) {
       entityId: song._id, entityLabel: song.title
     });
 
-    res.status(201).json({ song: song.toPublic() });
+    res.status(201).json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) {
     next(err);
   }
@@ -439,7 +514,7 @@ export async function update(req, res, next) {
       });
     }
 
-    res.json({ song: song.toPublic() });
+    res.json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) {
     next(err);
   }

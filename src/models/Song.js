@@ -202,7 +202,19 @@ songSchema.virtual('primary').get(function () {
  * Flattens the chosen arrangement onto the song, so clients that only care
  * about "the chords for this song" do not have to know arrangements exist.
  */
-songSchema.methods.toPublic = function (arrangementId = null) {
+/**
+ * The public shape of a song. The chord sheet is opt-in.
+ *
+ * AI-TRAP: `content` and `chords` used to be included always, so every list
+ * shipped a full chord sheet per row — the song list, search, an artist page,
+ * a genre page, saved songs. None of them draw it, so it was pure weight; and
+ * once a paywall existed it was also the way straight past it, because the gate
+ * was only ever applied on the single-song route. A response that carries what
+ * it does not render is a leak waiting for a reason to matter.
+ *
+ * Default false, so a new endpoint has to ask before it can give anything away.
+ */
+songSchema.methods.toPublic = function (arrangementId = null, { withContent = false } = {}) {
   // A link to a deleted version falls back to the default rather than 404ing:
   // somebody following an old bookmark wants the song, not an error.
   const asked = arrangementId ? this.arrangements.id(arrangementId) : null;
@@ -221,11 +233,11 @@ songSchema.methods.toPublic = function (arrangementId = null) {
     views: this.views || 0,
     favoriteCount: this.favoriteCount || 0,
 
-    content: chosen?.content || '',
+    // Only where somebody asked for it. See the note above the signature.
+    ...(withContent ? { content: chosen?.content || '', chords: chosen?.chords || [] } : {}),
     originalKey: chosen?.originalKey || '',
     capo: chosen?.capo || 0,
     difficulty: chosen?.difficulty,
-    chords: chosen?.chords || [],
     arrangementId: chosen?._id,
     rating: chosen?.ratingCount ? chosen.ratingSum / chosen.ratingCount : 0,
     ratingCount: chosen?.ratingCount || 0,

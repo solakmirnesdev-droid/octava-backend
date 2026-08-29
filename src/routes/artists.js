@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { list, getOne } from '../controllers/artistController.js';
+import { list, getOne, letterIndex } from '../controllers/artistController.js';
 import { optionalAuth, requireStaff, requireRole } from '../middleware/auth.js';
 import {
   create, update, remove, uploadImage, deleteImage, serveImage, MAX_IMAGE_BYTES,
@@ -16,6 +16,9 @@ router.get('/', validate({ query: artistListQuery }), list);
 // the bin returns 404 for an artist that does not exist. Same ordering the song
 // routes already needed.
 router.get('/trash', requireStaff, requireRole('admin'), listTrash);
+
+// Also before /:slug, for the same reason. Public: it is the alphabet strip.
+router.get('/index', letterIndex);
 
 router.get('/:slug', validate({ params: slugParam }), optionalAuth, getOne);
 

@@ -83,6 +83,21 @@ const userSchema = new mongoose.Schema(
      */
     passwordChangedAt: { type: Date, select: false },
 
+    /** See subscriptionActive() below — status and expiresAt are read together. */
+    subscription: {
+      status: {
+        type: String,
+        enum: ['none', 'active', 'cancelled', 'expired'],
+        default: 'none'
+      },
+      plan: { type: String, enum: ['monthly', 'yearly'], default: undefined },
+      startedAt: { type: Date, default: null },
+      expiresAt: { type: Date, default: null },
+      cancelledAt: { type: Date, default: null },
+      /** Which system granted it. 'simulated' never appears in production. */
+      source: { type: String, default: undefined }
+    },
+
     /**
      * Where the reader is.
      *
@@ -133,6 +148,28 @@ userSchema.methods.flag = function flag() {
 };
 
 /** Shape sent to clients. Never includes the hash. */
+/**
+ * Paid access.
+ *
+ * AI-DECISION: embedded on the account rather than kept in its own collection.
+ * Every gated request has to answer "may this person read this?" in one lookup,
+ * and the reader already arrives as a User document — a join on the hot path to
+ * learn something with one row per account is work for no return. When a real
+ * provider arrives, its webhooks write here and the receipts live wherever the
+ * provider keeps them, which is where an auditor would look anyway.
+ *
+ * AI-TRAP: `expiresAt` is the authority, not `status`. A cancelled subscription
+ * is still valid until the period it was paid for runs out, and an active one
+ * whose date has passed is not. Read them together or people lose access they
+ * paid for — or keep access they stopped paying for.
+ */
+userSchema.methods.subscriptionActive = function () {
+  const sub = this.subscription;
+  if (!sub || !sub.expiresAt) return false;
+  if (sub.status !== 'active' && sub.status !== 'cancelled') return false;
+  return sub.expiresAt.getTime() > Date.now();
+};
+
 userSchema.methods.toPublic = function () {
   return {
     id: this._id,
@@ -142,7 +179,13 @@ userSchema.methods.toPublic = function () {
     flag: this.flag(),
     hasAvatar: Boolean(this.avatarBytes),
     emailVerified: this.emailVerified,
-    createdAt: this.createdAt
+    createdAt: this.createdAt,
+    subscription: {
+      status: this.subscription?.status || 'none',
+      plan: this.subscription?.plan || null,
+      expiresAt: this.subscription?.expiresAt || null,
+      active: this.subscriptionActive()
+    }
   };
 };
 

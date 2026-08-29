@@ -18,6 +18,11 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * show a visitor. Computed here instead of maintained, because a count that is
  * derived cannot drift out of step with the rows it describes.
  */
+/** Artists have no draft state; the only thing hidden is a deleted one. */
+function visibilityFilterForArtists() {
+  return {};
+}
+
 async function visibleCounts(ids, staff) {
   const rows = await Song.aggregate([
     { $match: { ...visibilityFilter(staff), artist: { $in: ids } } },
@@ -48,11 +53,20 @@ export async function list(req, res, next) {
       if (folded) filter.searchName = new RegExp(escapeRegex(folded), 'i');
     }
 
-    // Alphabet navigation matches on the slug, so Č and C land together rather
-    // than Č being filed after Z where nobody looks for it.
+    /*
+     * Alphabet navigation matches the first letter of ANY word in the name.
+     *
+     * AI-DECISION: surname as well as first name. People look for Zdravko Čolić
+     * under Č as readily as under Z, and a strip that only knows the first letter
+     * of the full string sends half of them to an empty page. Bands are unchanged
+     * — "Bijelo Dugme" simply answers to B and to D.
+     *
+     * Matched against searchName, which is already folded, so Č and C land
+     * together rather than Č being filed after Z where nobody looks for it.
+     */
     if (req.query.letter) {
       const letter = slugify(req.query.letter).charAt(0);
-      if (letter) filter.slug = new RegExp('^' + letter, 'i');
+      if (letter) filter.searchName = new RegExp('(^|\\s)' + letter, 'i');
     }
 
     const [artists, total, letters, countries] = await Promise.all([
@@ -65,7 +79,12 @@ export async function list(req, res, next) {
         // artist keeps their initial lit up in the alphabet strip and their
         // country in the facet below unless it is filtered here by hand.
         { $match: Artist.livingMatch() },
-        { $group: { _id: { $toUpper: { $substrCP: ['$slug', 0, 1] } } } },
+        // Every word's initial, not just the first: the strip has to offer the
+        // same letters the filter above will actually answer to.
+        { $project: { words: { $split: ['$searchName', ' '] } } },
+        { $unwind: '$words' },
+        { $match: { words: { $ne: '' } } },
+        { $group: { _id: { $toUpper: { $substrCP: ['$words', 0, 1] } } } },
         { $sort: { _id: 1 } }
       ]),
       /*
@@ -124,6 +143,42 @@ export async function list(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Every artist's name and slug, grouped under each letter they answer to.
+ *
+ * AI-DECISION: one small payload rather than a request per hover. The whole
+ * catalogue of names is 137 rows and a few kilobytes; fetching per letter would
+ * put a network round trip behind a mouse movement, which is the one place a
+ * delay is unmissable. It is also why this returns names and slugs and nothing
+ * else — the moment it carries counts or images it stops being cheap.
+ *
+ * An artist appears under every distinct initial in their name, matching what
+ * the letter filter answers to: Zdravko Čolić is under Z and under C.
+ */
+export async function letterIndex(req, res, next) {
+  try {
+    const artists = await Artist.find(visibilityFilterForArtists(req.staff))
+      .select('name slug searchName')
+      .sort({ name: 1 });
+
+    const letters = {};
+    for (const a of artists) {
+      const initials = new Set(
+        String(a.searchName || '')
+          .split(' ')
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase())
+          .filter((c) => /^[A-Z]$/.test(c))
+      );
+      for (const c of initials) {
+        (letters[c] ||= []).push({ name: a.name, slug: a.slug });
+      }
+    }
+
+    res.json({ letters });
+  } catch (err) { next(err); }
 }
 
 export async function getOne(req, res, next) {
