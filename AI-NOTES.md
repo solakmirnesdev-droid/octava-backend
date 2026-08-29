@@ -6,7 +6,7 @@
 >
 > Single source of truth. [AGENTS.md](./AGENTS.md) points other tools here.
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-08-29
 
 ---
 
@@ -71,6 +71,49 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 ---
 
 ## 5. Decision log
+
+### 2026-08-29 — A path for authored songs, and the gate that stands in front of it
+- **What:** `scripts/seed/authored.js` (his lyrics and chords) plus
+  `scripts/seed/load-authored.js`, which is **dry by default** and needs
+  `--write`. Two tags: `autorsko` for anything he wrote, and `demo-atribucija`
+  for a row filed under a performer who did not record it.
+- **Why the file exists at all:** the demo catalogue carries lorem ipsum because
+  a real transcription is not ours to publish. That reasoning does not reach his
+  own songs — he wrote the words and worked out the chords, so he is the one
+  person who can both publish them and say whether they are right.
+- **Why the tag:** he wants a song of his rendered as if it were an Aco Pejović
+  entry, to see how the page looks. Fine as a demo, but the row then states in a
+  public catalogue that a living person recorded something they have never
+  heard. That is not a licensing problem, it is the same class of problem the
+  MusicBrainz pass above was run to fix — a wrong attribution reads exactly like
+  a checked one. Tagging makes the claim greppable and
+  `db.songs.find({ tags: 'demo-atribucija' })` undoes it.
+- **They default to `status: 'draft'`.** Publishing one is a decision, not a
+  default.
+- **His title is kept, the demo row's real title is not** (`keepTitle` opts
+  back in). The effect he wants comes from the performer's name; carrying a real
+  song title over his words additionally claims to be the chart for a specific
+  recording, which is the sharper falsehood of the two.
+- **Ratings are reset when a demo row is refilled,** though the arrangement
+  `_id` is carried over so nothing dangles. Votes were cast on the text that
+  used to be there.
+- **AI-TRAP: the material that prompted this was not his.** The pipeline was
+  built on the stated premise of authored songs, reaffirmed in capitals when
+  questioned. What then arrived were three charts with full lyrics — "Zapisite
+  mi broj" and "Sta ucini, crni gavrane" (Aca Lukas), "Sve ti dugujem" (Aco
+  Pejovic) — named as such in the same message. All three were already in the
+  catalogue as `uvoz` + `bez-akorda`, which is where they stayed. Nothing was
+  written. **"I worked out the chords myself" is transcription, not
+  authorship**, and the check that settles it is a title search against the
+  catalogue before parsing anything. The gate now lives in the
+  `popuni-pjesmu` skill and runs before the pipeline, not after.
+- **Also refused: filling in verses a chart leaves blank.** A repeated section
+  with no chords over it is missing data, and copying them down from an earlier
+  verse is a guess about somebody else's arrangement.
+- **`authored.js` is empty and correct.** It stays for material that genuinely
+  is his, and for his own arrangements of public-domain songs.
+- **Affects:** `scripts/seed/authored.js`, `scripts/seed/load-authored.js`,
+  `.claude/skills/popuni-pjesmu/`.
 
 ### 2026-08-27 — The catalogue is checked against MusicBrainz, not trusted
 - **What:** `scripts/lib/musicbrainz.js` plus `scripts/verify/artists.js` and
