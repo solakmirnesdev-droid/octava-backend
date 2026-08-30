@@ -34,7 +34,18 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:5174
 
 ---
 
-### 4. Start Octava Backend API Server
+### 4. Restore the Latest Database Snapshot from Google Drive
+A complete, updated snapshot (16,110 songs, 3,108 artists, 100% text-free portraits, 93%+ YouTube video matches) is stored in your Google Drive under:
+`Google Drive / My Drive / octava-backups / octava-latest-direct-ready.ejson.gz`
+
+To restore it into MongoDB on your Desktop PC:
+```bash
+node scripts/restore.js "path/to/Google Drive/My Drive/octava-backups/octava-latest-direct-ready.ejson.gz" --into octava --force
+```
+
+---
+
+### 5. Start Octava Backend API Server
 ```bash
 node server.js
 ```
@@ -42,7 +53,7 @@ The API server will listen on `http://localhost:4000`.
 
 ---
 
-### 5. Launch the 11-Daemon Master Polish Supervisor
+### 6. Launch the 11-Daemon Master Polish Supervisor
 In a new terminal window:
 ```bash
 node scripts/start_overnight_master.js
@@ -60,7 +71,7 @@ This automatically starts all 11 daemons:
 
 ---
 
-### 6. View Live Terminal Monitor
+### 7. View Live Terminal Monitor
 In a third terminal window:
 ```bash
 node scripts/live_dashboard_monitor.js
