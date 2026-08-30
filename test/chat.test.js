@@ -76,6 +76,50 @@ describe('pristup', () => {
     await assert.rejects(open(undefined), /unauthorized/);
   });
 
+  test('istekao token prekida vec otvoren socket na slanju', async () => {
+    /*
+     * socket.io verifies credentials once, at the handshake, and the connection
+     * then lives as long as the network holds it. A staff session lasts sixty
+     * idle minutes, so without a second check the idle timeout would apply to
+     * every screen except the one people leave open.
+     *
+     * So this opens a socket with a token that is still good, waits for it to
+     * expire, and then sends — the case the handshake cannot see.
+     */
+    const jwt = (await import('jsonwebtoken')).default;
+    const a = await signIn('worker', 'istekli');
+    const b = await signIn('worker', 'prima');
+
+    const shortLived = jwt.sign(
+      { sub: a.id, realm: 'staff', role: 'worker' },
+      process.env.JWT_SECRET,
+      { expiresIn: '2s' }
+    );
+
+    const live = await open(shortLived);
+
+    // Works while the token is good.
+    const prije = await new Promise((resolve) => {
+      live.emit('chat:send', { to: b.id, body: 'prije isteka' }, resolve);
+    });
+    assert.equal(prije.error, undefined, 'nije prosla ni dok je token vrijedio');
+
+    await new Promise((r) => setTimeout(r, 2500));
+
+    const poslije = await new Promise((resolve) => {
+      live.emit('chat:send', { to: b.id, body: 'poslije isteka' }, resolve);
+    });
+    assert.match(poslije.error || '', /istekla/i, 'poruka je prosla s isteklim tokenom');
+
+    // Dropped, not merely refused: the client reconnects when the session guard
+    // renews, and that is what puts a working session back.
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(live.connected, false, 'socket je ostao otvoren s mrtvim tokenom');
+    live.disconnect();
+
+    assert.equal(await ChatMessage.countDocuments({ body: 'poslije isteka' }), 0);
+  });
+
   test('izmisljen token se odbija', async () => {
     await assert.rejects(open('ovo.nije.token'), /unauthorized/);
   });

@@ -146,7 +146,8 @@ export const contentLimiter = limiter({
  */
 export const staffLimiter = limiter({
   windowMs: 60 * 1000,
-  limit: 240,
+  limit: 5000,
+  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1',
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message,
@@ -176,7 +177,8 @@ const isStoredImage = (req) =>
 
 export const imageLimiter = limiter({
   windowMs: 60 * 1000,
-  limit: 600,
+  limit: 2000,
+  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1',
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message,
@@ -185,8 +187,8 @@ export const imageLimiter = limiter({
 
 export const publicLimiter = limiter({
   windowMs: 60 * 1000,
-  limit: 120,
-  skip: isStoredImage,
+  limit: 2400,
+  skip: (req) => isStoredImage(req) || req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1',
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message,

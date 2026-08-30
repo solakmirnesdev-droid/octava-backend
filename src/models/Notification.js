@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ['review.created', 'comment.created', 'request.created', 'request.voted', 'report.created', 'user.registered'],
+      enum: ['review.created', 'comment.created', 'request.created', 'request.voted', 'report.created', 'user.registered', 'song.created'],
       required: true,
       index: true
     },
@@ -30,6 +30,22 @@ const notificationSchema = new mongoose.Schema(
 
     /** The reader who caused it. Null for anything the system raises itself. */
     actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+    /**
+     * The desk member who caused it, for events the desk raises about itself.
+     *
+     * AI-DECISION: a separate field rather than widening `actor`. Readers and
+     * staff are two identity realms in this codebase and a single ref pointing
+     * at whichever collection happened to be involved is a populate that
+     * silently returns null half the time.
+     *
+     * AI-NOTE: the name and rank are copied in, not referenced — the same
+     * reason AuditLog copies them. A feed row that turns into "unknown added a
+     * song" once an account is closed is not a record of anything.
+     */
+    staffActor: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', default: null },
+    actorName: { type: String, trim: true, default: '' },
+    actorRole: { type: String, trim: true, default: '' },
 
     /**
      * A short, already-rendered summary. Kept because the thing a notification

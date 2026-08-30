@@ -341,6 +341,8 @@ export async function serveImage(req, res, next) {
       'Content-Type': artist.imageType || 'image/webp',
       'Content-Length': artist.image.length,
       'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Access-Control-Allow-Origin': '*',
       ETag: tag
     });
     res.end(artist.image);

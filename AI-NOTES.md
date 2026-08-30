@@ -72,6 +72,98 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-08-30 — The dashboard updates itself, including for writes it cannot see
+
+- **What it does:** the API announces `data:changed` over the chat's existing
+  socket, and the views that show a list refetch themselves. The event names
+  what moved, never the change — patching a list from a payload means
+  reimplementing every filter, sort and page boundary on the client and getting
+  them subtly wrong; asking the API again is one request and always right.
+- **Announced from the models, not the handlers.** Twenty-five places write a
+  song or an artist; a rule kept in twenty-five places gets missed in one, and a
+  screen that refreshes for every edit except one is worse than one that never
+  refreshes.
+- **The part that took the longest to see:** model hooks only fire inside the
+  process doing the write. The catalogue is filled by standalone scripts — often
+  several at once — and their writes reached the database and nothing else. From
+  the desk that looked exactly like the feature not working. `realtime/watch.js`
+  polls a fingerprint (count + newest `updatedAt`) every four seconds while at
+  least one socket is connected, and announces when it moves.
+- **Change streams would be the right tool and are unavailable:** this mongod is
+  standalone (`hello.setName` undefined), so `watch()` throws rather than
+  degrading. If it ever becomes a replica set, replace the poll.
+- **`updatedAt` is indexed on both models** — without it that poll is a
+  collection scan of 7,500 documents every four seconds.
+- **Two bugs found while proving it:**
+  - `StatsView.load()` cached the overview, so calling it again returned the
+    figures from the first visit — exactly the numbers somebody watching is
+    waiting to see move. It now takes `{ fresh: true }`.
+  - Two `nodemon` processes were fighting over port 4000, so half the testing
+    was talking to a stale server. If behaviour disagrees with the code, check
+    `lsof -nP -iTCP:4000` before reading the code again.
+- **Verified by writing straight into MongoDB**, bypassing the API entirely: the
+  count moved 7476 → 7477 with a marker on `window` proving the page had not
+  reloaded.
+- **Files:** `realtime/changes.js`, `realtime/watch.js`, `models/Song.js`,
+  `models/Artist.js`, `server.js`; dashboard `composables/useLiveData.js` and
+  five views.
+
+### 2026-08-30 — The chat socket now has to keep proving its token
+
+- **Found while auditing socket.io:** the handshake verifies credentials once,
+  and the connection then lives as long as the network holds it. That was
+  survivable when a staff session lasted a week. It is not now that one lasts
+  sixty idle minutes — the timeout would have applied to every screen except the
+  one people leave open all day.
+- **Fix:** `tokenStillValid()` re-checks signature and expiry before each send,
+  and a socket that fails it is **disconnected**, not merely refused. The client
+  watches its token and reconnects when the session guard renews one, so
+  dropping the connection is what puts a working session back; answering
+  "expired" while holding it open leaves it somewhere nothing recovers from.
+- **Cheap on purpose:** signature and expiry only, no database round trip — far
+  less than the two lookups the send already does. `active` is still read from
+  the database separately, because deactivation must bite before the token runs
+  out rather than after it.
+- **The test was checked against its own absence:** 15/16 with the guard
+  disabled, 16/16 with it. It opens a socket on a two-second token, sends
+  successfully, waits, and sends again.
+- **Also:** the socket's CORS list had the same untrimmed `split(',')` as the
+  express side, so `"a, b"` left the second origin unmatchable.
+- **The rest of socket.io is properly configured** — handshake auth, a room per
+  account rather than per socket, a send limiter (an event is not a route, so
+  express-rate-limit does not cover it), and presence in memory with a note
+  that the Redis adapter is the answer if this ever runs as more than one
+  process. nginx already upgrades the connection; see `deploy/nginx.conf.example`.
+- **Files:** `realtime/chat.js`, `test/chat.test.js`.
+
+### 2026-08-30 — Deploy, finished: two services, one static build
+
+- **What was there:** `nginx.conf.example` and nothing else. It proxied to
+  `:3000` and `:4000`, and nothing on the machine started or supervised either.
+- **Now:** `octava-api.service` and `octava-web.service`, plus `deploy/README.md`
+  with the real sequence. The dashboard needs no unit — it is a static build
+  nginx serves from `/var/www/octava-dashboard`, rebuilt and rsynced per release.
+- **`ExecStart=/usr/bin/node`, absolute on purpose.** systemd has no login
+  shell, so an nvm-managed node is not on its PATH, and the failure it produces
+  (`203/EXEC`) says nothing about why.
+- **`ReadWritePaths=/srv/octava/backups`** is required by `ProtectSystem=strict`
+  or `scripts/backup.js` fails with EROFS, which reads as a disk fault.
+- **Two real gaps found while writing it:**
+  - nginx had no port 80 listener at all, so a bare domain answered "connection
+    refused" and certbot had nowhere to serve its challenge. Added, with
+    `.well-known` excluded from the redirect — a blanket 301 sends the ACME
+    challenge away and renewal fails silently until the certificate expires.
+  - `CORS_ORIGIN.split(',')` did not trim, so `"a, b"` left the second origin
+    with a leading space, matching nothing. The browser then reports a CORS
+    failure that looks like a server fault rather than a typo in an env file.
+- **`.env.example` covered 8 of the 24 variables the code reads.** Now all of
+  them, each with what breaks when it is wrong — `NUXT_PUBLIC_SITE_URL` above
+  all, which silently hands Google thousands of localhost URLs.
+- **nginx syntax is unverified:** nginx is not installed on this machine, so the
+  new block was written but never run through `nginx -t`. Do that on the server.
+- **Files:** `deploy/octava-api.service`, `deploy/octava-web.service`,
+  `deploy/README.md`, `deploy/nginx.conf.example`, `.env.example`, `src/app.js`.
+
 ### 2026-08-30 — Audit: can an outsider get the real sheet? (no)
 
 Probed unauthenticated against a running server, looking for lyric-only words

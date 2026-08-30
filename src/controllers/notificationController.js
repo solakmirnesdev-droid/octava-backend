@@ -35,6 +35,15 @@ export async function list(req, res, next) {
         comment: n.comment,
         request: n.request,
         actor: n.actor?.username || null,
+        /*
+         * The desk member behind a desk event, and their rank.
+         *
+         * AI-NOTE: read off the row rather than populated. They are copied in
+         * at write time so the line still reads correctly after the account is
+         * gone - see Notification.js.
+         */
+        actorName: n.actorName || null,
+        actorRole: n.actorRole || null,
         createdAt: n.createdAt,
         read: n.readBy.some((id) => String(id) === String(req.staff._id))
       })),

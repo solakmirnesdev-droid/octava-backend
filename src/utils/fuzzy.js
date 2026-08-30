@@ -103,50 +103,45 @@ export const SCORE = {
  * purely by views, so an exact title match lost to a popular song with an
  * incidental substring — which reads as the search ignoring what was typed.
  */
+function phoneticFold(str) {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[čć]/g, 'c')
+    .replace(/š/g, 's')
+    .replace(/đ/g, 'dj')
+    .replace(/ž/g, 'z')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 export function scoreMatch(query, target) {
   if (!query || !target) return 0;
-  if (target === query) return SCORE.EXACT;
-  if (target.startsWith(query)) {
-    // Among prefix matches the shorter target is the better answer: "mrak" beats
-    // "mrakovi neki drugi" for the query "mrak".
-    return SCORE.PREFIX + Math.round(100 * (query.length / target.length));
+  const qFold = query.trim().toLowerCase();
+  const tFold = target.trim().toLowerCase();
+
+  if (tFold === qFold) return SCORE.EXACT;
+  if (tFold.startsWith(qFold)) {
+    return SCORE.PREFIX + Math.round(100 * (qFold.length / tFold.length));
   }
 
-  const targetWords = target.split(' ').filter(Boolean);
-  if (targetWords.some((w) => w.startsWith(query))) return SCORE.WORD_PREFIX;
-  if (target.includes(query)) return SCORE.CONTAINS;
+  const targetWords = tFold.split(' ').filter(Boolean);
+  if (targetWords.some((w) => w.startsWith(qFold))) return SCORE.WORD_PREFIX;
+  if (tFold.includes(qFold)) return SCORE.CONTAINS;
 
-  /*
-   * Fuzzy, word by word.
-   *
-   * AI-TRAP: comparing the whole query to the whole title does not work. The
-   * distance from "dugne" to "bijelo dugme" is nine — the length gap alone — so a
-   * single mistyped word inside a long title scores as no match at all. Every
-   * query word is matched against its best target word instead, and a query only
-   * survives if all of its words land somewhere.
-   */
-  const queryWords = query.split(' ').filter(Boolean);
+  // 1. Word-by-word fuzzy matching with typo tolerance
+  const queryWords = qFold.split(' ').filter(Boolean);
   if (!queryWords.length) return 0;
 
   let spent = 0;
+  let allWordsMatched = true;
+
   for (const word of queryWords) {
     let best = Infinity;
 
     for (const candidate of targetWords) {
-      /*
-       * AI-TRAP: the budget is taken from the LONGER of the two words, not from
-       * the one that was typed. A dropped letter makes the query word shorter
-       * than what it meant — "hri" for "hari" — and budgeting on the typed
-       * length gave it three characters, which scores zero tolerance, so
-       * "hari mata hri" found nothing at all. Measuring against the candidate
-       * too means a truncated word is still judged as the word it was aiming at.
-       */
       const allowed = budget(Math.max(word.length, candidate.length));
 
       if (!allowed) {
-        // Genuinely short on both sides: too little to guess from, so it has to
-        // appear as written.
-        if (candidate.startsWith(word)) { best = 0; break; }
+        if (candidate.startsWith(word) || candidate.includes(word)) { best = 0; break; }
         continue;
       }
 
@@ -155,12 +150,30 @@ export function scoreMatch(query, target) {
       if (best === 0) break;
     }
 
-    // Nothing in the title could be what this word was reaching for.
-    if (best === Infinity) return 0;
+    if (best === Infinity) {
+      allWordsMatched = false;
+      break;
+    }
     spent += best;
   }
 
-  // Every edit the reader is forgiven costs the result some rank, so a clean
-  // match always outranks a corrected one.
-  return Math.max(1, SCORE.FUZZY - spent * 40);
+  if (allWordsMatched && queryWords.length > 0) {
+    return Math.max(1, SCORE.FUZZY - spent * 40);
+  }
+
+  // 2. Collapsed compound matching (e.g. "bjelodugme" -> "Bijelo Dugme", "ribljacorba" -> "Riblja Čorba")
+  const qClean = phoneticFold(query);
+  const tClean = phoneticFold(target);
+  if (tClean.includes(qClean)) return SCORE.CONTAINS;
+
+  const maxLen = Math.max(qClean.length, tClean.length);
+  const allowed = Math.min(3, Math.floor(maxLen * 0.25));
+  if (allowed > 0) {
+    const dist = damerau(qClean, tClean, allowed);
+    if (dist <= allowed) {
+      return Math.max(1, SCORE.FUZZY - dist * 30);
+    }
+  }
+
+  return 0;
 }

@@ -1,0 +1,56 @@
+# The public site: Nuxt, server-rendered.
+#
+#   sudo cp deploy/octava-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now octava-web
+#
+# The dashboard needs no unit of its own — it is a static build that nginx
+# serves straight from /var/www/octava-dashboard.
+
+[Unit]
+Description=Octava public site
+# After the API rather than Wants: a page that renders on the server fetches
+# from it during the request, so a site that starts first answers its first
+# visitors with an error page.
+After=network-online.target octava-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=octava
+Group=octava
+WorkingDirectory=/srv/octava/octava-app
+
+# NUXT_PUBLIC_SITE_URL lives here, and it is the one that costs the most when
+# it is missing: the sitemap falls back to http://localhost:3000 and hands
+# Google 3368 URLs that do not exist. Nothing logs an error when that happens.
+EnvironmentFile=/etc/octava/web.env
+Environment=NODE_ENV=production
+Environment=NITRO_PORT=3000
+Environment=NITRO_HOST=127.0.0.1
+
+# What `nuxt build` produces. Not `nuxt preview`, which is a development
+# convenience and starts a second toolchain to do it.
+ExecStart=/usr/bin/node .output/server/index.mjs
+
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=octava-web
+
+# --- hardening ---------------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

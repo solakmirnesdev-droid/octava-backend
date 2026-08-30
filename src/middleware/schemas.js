@@ -37,7 +37,15 @@ export const artistListQuery = pagination.extend({
   // Yugoslav-era artist. Two letters and nothing else — the codes are matched
   // against a stored field, so anything longer is a caller getting it wrong
   // rather than a query worth running.
-  country: z.string().trim().regex(/^[A-Za-z]{2}$/).optional()
+  country: z.string().trim().regex(/^[A-Za-z]{2}$/).optional(),
+  /*
+   * Work queues, not search: rows the catalogue is missing something on.
+   *
+   * An enum rather than free text because each value is a hand-written query
+   * below; anything else would either be ignored silently or invite building
+   * the filter out of whatever arrived.
+   */
+  gap: z.enum(['country', 'image']).optional()
 }).strict();
 
 export const songDetailQuery = z.object({

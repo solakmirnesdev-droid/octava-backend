@@ -10,3 +10,7 @@ node_modules/
 *.log
 dist/
 build/
+logs/
+backups/
+reports/
+data/

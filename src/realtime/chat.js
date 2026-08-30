@@ -95,11 +95,33 @@ function detach(id, socketId) {
   return true;
 }
 
+/**
+ * The live connection, kept so anything outside the chat can push to the desk.
+ *
+ * AI-TRAP: null until initChat runs, and it never runs under the test harness
+ * or in a script. Every caller has to tolerate that — a notification failing to
+ * reach a screen must never fail the action that raised it, exactly as
+ * Notification.raise swallows its own errors.
+ */
+let live = null;
+
+/** Sends an event to every connected staff socket. No-op when nobody is listening. */
+export function pushToStaff(event, payload) {
+  try {
+    live?.emit(event, payload);
+  } catch (err) {
+    console.error('[realtime]', err.message);
+  }
+}
+
 export function initChat(httpServer) {
   const io = new Server(httpServer, {
     path: '/socket.io',
     cors: {
-      origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:8000'],
+      // Trimmed like the express side: "a, b" is how anybody writes a list, and
+      // an origin with a leading space matches nothing while looking correct.
+      origin: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean)
+        || ['http://localhost:3000', 'http://localhost:8000'],
       credentials: true
     }
   });
@@ -129,6 +151,30 @@ export function initChat(httpServer) {
     }
   });
 
+  /**
+   * Is the token this socket handshook with still good?
+   *
+   * AI-TRAP: socket.io verifies credentials once, and the connection then lives
+   * for as long as the network holds it. That was survivable while a staff
+   * session lasted a week; it is not now that one lasts sixty idle minutes. An
+   * open socket would have kept sending long after the session it was opened
+   * with had expired — the idle timeout would apply to every screen except this
+   * one, which is the screen somebody leaves open.
+   *
+   * Signature and expiry only: no database round trip, so this is far cheaper
+   * than the two lookups the send already does. `active` is still read from the
+   * database separately, because deactivation has to bite before the token runs
+   * out rather than after it.
+   */
+  const tokenStillValid = (socket) => {
+    try {
+      verifyToken(socket.handshake.auth?.token, REALM_STAFF);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   io.on('connection', (socket) => {
     const me = socket.staff;
 
@@ -152,6 +198,18 @@ export function initChat(httpServer) {
 
         if (overSendLimit(me._id)) {
           return ack?.({ error: 'Previše poruka. Sačekaj malo.' });
+        }
+
+        /*
+         * Disconnected rather than merely refused: the client watches its token
+         * and reconnects when the session guard renews one, so dropping the
+         * socket is what puts a working session back. Answering "expired" while
+         * holding the connection open leaves it in a state nothing recovers it
+         * from.
+         */
+        if (!tokenStillValid(socket)) {
+          ack?.({ error: 'Sesija je istekla. Prijavi se ponovo.' });
+          return socket.disconnect(true);
         }
 
         const [sender, recipient] = await Promise.all([
@@ -207,6 +265,7 @@ export function initChat(httpServer) {
     });
   });
 
+  live = io;
   return io;
 }
 

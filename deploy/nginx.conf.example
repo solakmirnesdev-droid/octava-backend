@@ -21,6 +21,25 @@ upstream octava_api {
     keepalive 32;
 }
 
+# ----------------------------------------------------------------- plain http
+# Browsers try http first when somebody types a bare domain, so without this
+# block the site answers "connection refused" to anyone who does not type the
+# scheme. Certbot also needs .well-known reachable over port 80 to renew, and a
+# blanket redirect would send the challenge away with a 301.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name octava.example desk.octava.example;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
 # ---------------------------------------------------------------- public site
 server {
     listen 443 ssl http2;

@@ -10,6 +10,8 @@ import { slugify } from '../utils/slug.js';
 import { isChord } from '../utils/chords.js';
 import { visibilityFilter } from '../utils/visibility.js';
 import { detachSongs } from '../utils/songCleanup.js';
+import Notification from '../models/Notification.js';
+import { pushToStaff } from '../realtime/chat.js';
 import { mayReadPaid, paywallOn } from '../middleware/subscription.js';
 import { scoreMatch } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
@@ -488,6 +490,41 @@ export async function create(req, res, next) {
       req, action: 'create', entity: 'song',
       entityId: song._id, entityLabel: song.title
     });
+
+    /*
+     * The desk hears about its own additions.
+     *
+     * AI-DECISION: raised here and not in the audit log, because the two answer
+     * different questions. The audit trail is looked at when somebody asks what
+     * happened to a record; this is what tells a colleague, while they are
+     * working, that the catalogue grew under them — the exact thing that used
+     * to require noticing a number had changed after a manual reload.
+     *
+     * `raise` swallows its own errors, so a failed feed never fails a save.
+     */
+    const notification = await Notification.raise({
+      type: 'song.created',
+      song: song._id,
+      staffActor: req.staff._id,
+      actorName: req.staff.name || req.staff.email,
+      actorRole: req.staff.role,
+      summary: `${req.staff.name || req.staff.email} je dodao/la "${song.title}"`
+        + (song.artist?.name ? ` — ${song.artist.name}` : '')
+    });
+
+    // Pushed as well as stored: the badge polls, and a poll is a delay measured
+    // in whatever the interval happens to be.
+    if (notification) {
+      pushToStaff('notification:new', {
+        _id: notification._id,
+        type: notification.type,
+        summary: notification.summary,
+        actorName: notification.actorName,
+        actorRole: notification.actorRole,
+        song: { _id: song._id, title: song.title, slug: song.slug },
+        createdAt: notification.createdAt
+      });
+    }
 
     res.status(201).json({ song: song.toPublic(null, { withContent: true }) });
   } catch (err) {

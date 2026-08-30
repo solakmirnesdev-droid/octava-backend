@@ -50,9 +50,19 @@ const app = express();
 // all together.
 app.set('trust proxy', 1);
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false
+}));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:8000'],
+  /*
+   * Trimmed, because "a, b" is how anybody writes a list. Without it the second
+   * origin carries a leading space, matches nothing, and the browser reports a
+   * CORS failure that looks like a server problem rather than a typo in an env
+   * file. Blanks are dropped so a trailing comma is harmless too.
+   */
+  origin: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean)
+    || ['http://localhost:3000', 'http://localhost:8000'],
   credentials: true
 }));
 app.use(cookieParser());

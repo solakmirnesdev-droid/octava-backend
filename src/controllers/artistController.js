@@ -48,6 +48,29 @@ export async function list(req, res, next) {
       filter.country = String(req.query.country).toUpperCase().slice(0, 2);
     }
 
+    /*
+     * The two gaps worth working through, as filters rather than as a report.
+     *
+     * AI-DECISION: put on the list people already use instead of a separate
+     * screen. The catalogue grew past eight hundred performers and the missing
+     * fields are only fixable in the same place they are edited — a report
+     * would mean reading a name here and finding it again over there.
+     *
+     * AI-TRAP: "no picture" is not `imageBytes: 0`. A performer can carry an
+     * `imageUrl` pointing somewhere else entirely and render perfectly well,
+     * and counting them as unillustrated sends somebody to fix what is not
+     * broken. Both have to be absent. Country is stored with
+     * `default: undefined`, so absent, null and empty are all the same answer.
+     */
+    if (req.query.gap === 'country') {
+      filter.$or = [{ country: { $exists: false } }, { country: null }, { country: '' }];
+    } else if (req.query.gap === 'image') {
+      filter.$and = [
+        { $or: [{ imageBytes: { $exists: false } }, { imageBytes: 0 }] },
+        { $or: [{ imageUrl: { $exists: false } }, { imageUrl: null }, { imageUrl: '' }] }
+      ];
+    }
+
     if (req.query.q) {
       const folded = slugify(req.query.q).replace(/-/g, ' ');
       if (folded) filter.searchName = new RegExp(escapeRegex(folded), 'i');

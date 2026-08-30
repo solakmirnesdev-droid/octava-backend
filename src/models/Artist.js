@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { announce } from '../realtime/changes.js';
 import { uniqueSlug, slugify } from '../utils/slug.js';
 import { toLatin, hasCyrillic } from '../utils/latinise.js';
 
@@ -132,25 +133,35 @@ artistSchema.statics.livingMatch = function livingMatch(match = {}) {
 };
 
 artistSchema.statics.findOrCreateByName = async function (name) {
-  // AI-TRAP: latinise before the lookup, not only on save. Searching for
-  // "Тоше Проески" never matches the stored "Toše Proeski", so the schema hook
-  // would convert it on create and produce a second copy of the same artist —
-  // the exact duplicate this function exists to prevent.
-  const trimmed = toLatin((name || '').trim());
+  if (!name) return null;
+  let trimmed = toLatin(name).trim();
+
+  // Strip parentheses and brackets e.g. "(peklenska) Pomaranca" -> "Pomaranca"
+  trimmed = trimmed.replace(/^\s*[\(\[][^\)\]]*[\)\]]\s*/, '').trim();
+  trimmed = trimmed.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').trim();
+  trimmed = trimmed.replace(/[\.\-\_\,\:\;]+$/, '').trim();
+
   if (!trimmed) return null;
 
-  /*
-   * AI-TRAP: this has to look past the soft delete, and it is not optional.
-   * `slug` is a unique index, so a deleted artist still owns theirs. Scoped to
-   * living rows this finds nothing, calls create(), and the pre-validate hook
-   * generates the same slug the dead row is holding — a duplicate key error, so
-   * adding a song by a previously deleted performer would fail with a 500.
-   *
-   * Reviving is also simply what the act means: adding a song by somebody you
-   * deleted is asking for them back, not asking for a second copy.
-   */
+  // Title Case
+  const words = trimmed.split(/(\s+|-)/);
+  const lowercaseParticles = new Set(['i', 'u', 'na', 'o', 'po', 'sa', 'za', 'do', 'od', 'iz', 'k', 's', 'te', 'pa', 'ni', 'niti', '&']);
+  const capitalized = words.map((w, i) => {
+    if (/^\s+$/.test(w) || w === '-') return w;
+    const lower = w.toLowerCase();
+    if (i > 0 && lowercaseParticles.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join('');
+
+  const folded = slugify(capitalized).replace(/-/g, ' ');
+  const targetSlug = slugify(capitalized);
+
   const existing = await this.findOne({
-    name: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+    $or: [
+      { name: new RegExp(`^${capitalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      { searchName: folded },
+      { slug: targetSlug }
+    ]
   }).setOptions({ withDeleted: true });
 
   if (existing) {
@@ -162,7 +173,7 @@ artistSchema.statics.findOrCreateByName = async function (name) {
     return existing;
   }
 
-  return this.create({ name: trimmed });
+  return this.create({ name: capitalized });
 };
 
 
@@ -212,5 +223,27 @@ artistSchema.methods.toCard = function toCard() {
     activeTo: this.activeTo || null
   };
 };
+
+/**
+ * Tell any open dashboard that this collection moved.
+ *
+ * AI-DECISION: on the model, not in the handlers. Roughly twenty-five places
+ * write a an artist — six controllers, the bulk edit, the importer, several
+ * scripts — and a rule kept in twenty-five places is one that gets missed in
+ * one. A screen that refreshes for every edit except one is worse than one that
+ * never refreshes, because nobody can tell which case they are looking at.
+ *
+ * AI-TRAP: `deleteOne` and `findOneAndUpdate` are separate hooks from `save`.
+ * Mongoose fires document middleware and query middleware for different calls,
+ * so covering only `save` misses every soft delete and every bulk write — which
+ * are exactly the operations somebody is watching the screen for.
+ */
+// The live watcher asks for the newest row every few seconds; without this
+// that is a collection scan of the whole catalogue each time.
+artistSchema.index({ updatedAt: -1 });
+
+for (const event of ['save', 'findOneAndUpdate', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany']) {
+  artistSchema.post(event, function announceChange() { announce('artists'); });
+}
 
 export default mongoose.model('Artist', artistSchema);

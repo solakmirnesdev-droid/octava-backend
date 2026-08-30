@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { announce } from '../realtime/changes.js';
 import { uniqueSlug, slugify } from '../utils/slug.js';
 import { toLatin, hasCyrillic } from '../utils/latinise.js';
 import { extractChords } from '../utils/chords.js';
@@ -260,5 +261,27 @@ songSchema.index(
   { title: 'text', 'arrangements.content': 'text' },
   { weights: { title: 10, 'arrangements.content': 1 }, name: 'song_search' }
 );
+
+/**
+ * Tell any open dashboard that this collection moved.
+ *
+ * AI-DECISION: on the model, not in the handlers. Roughly twenty-five places
+ * write a song — six controllers, the bulk edit, the importer, several
+ * scripts — and a rule kept in twenty-five places is one that gets missed in
+ * one. A screen that refreshes for every edit except one is worse than one that
+ * never refreshes, because nobody can tell which case they are looking at.
+ *
+ * AI-TRAP: `deleteOne` and `findOneAndUpdate` are separate hooks from `save`.
+ * Mongoose fires document middleware and query middleware for different calls,
+ * so covering only `save` misses every soft delete and every bulk write — which
+ * are exactly the operations somebody is watching the screen for.
+ */
+// The live watcher asks for the newest row every few seconds; without this
+// that is a collection scan of the whole catalogue each time.
+songSchema.index({ updatedAt: -1 });
+
+for (const event of ['save', 'findOneAndUpdate', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany']) {
+  songSchema.post(event, function announceChange() { announce('songs'); });
+}
 
 export default mongoose.model('Song', songSchema);

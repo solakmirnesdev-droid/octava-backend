@@ -1,0 +1,60 @@
+# The API, and with it the chat socket.
+#
+#   sudo cp deploy/octava-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now octava-api
+#
+# Adjust User, WorkingDirectory and the node path to match the machine.
+
+[Unit]
+Description=Octava API
+Documentation=https://github.com/solakmirnesdev-droid/octava-backend
+# Wants, not Requires: a mongod that is slow to come up should delay this
+# service, not fail it. The driver reconnects on its own once Mongo answers.
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=octava
+Group=octava
+WorkingDirectory=/srv/octava/octava-backend
+
+# The file that holds JWT_SECRET, MONGODB_URI and the mail key. Keep it 600 and
+# owned by root: EnvironmentFile is read by systemd before dropping privileges,
+# so the service user never needs to be able to read it.
+EnvironmentFile=/etc/octava/api.env
+Environment=NODE_ENV=production
+
+# Absolute path on purpose. A login shell's nvm is not on PATH here, and the
+# error when it is missing ("203/EXEC") says nothing about why.
+ExecStart=/usr/bin/node server.js
+
+Restart=on-failure
+RestartSec=5
+# Five failures inside a minute means it is not going to start by trying again;
+# stop and leave the unit failed so the alert is a stopped service, not a loop.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=octava-api
+
+# --- hardening ---------------------------------------------------------------
+# The process reads its own directory and writes backups; it has no business
+# anywhere else on the filesystem.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# BACKUP_DIR must be listed here or scripts/backup.js writes into a read-only
+# filesystem and fails with EROFS, which reads as a disk problem.
+ReadWritePaths=/srv/octava/backups
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

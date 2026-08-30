@@ -13,6 +13,7 @@ import mongoose from 'mongoose';
 import app from './src/app.js';
 import { connectDB } from './src/config/db.js';
 import { initChat } from './src/realtime/chat.js';
+import { startWatching } from './src/realtime/watch.js';
 
 const PORT = env.PORT;
 
@@ -33,6 +34,13 @@ try {
    */
   server = http.createServer(app);
   io = initChat(server);
+
+  /*
+   * Writes made by other processes — a fill script, the importer, a second
+   * agent — never pass through this one, so the model hooks cannot see them.
+   * This is what makes those visible on an open dashboard.
+   */
+  startWatching();
 
   server.listen(PORT, () => {
     console.log(`✓ Octava backend na http://localhost:${PORT}`);
