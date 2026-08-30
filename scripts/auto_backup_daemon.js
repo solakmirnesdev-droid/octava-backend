@@ -113,7 +113,9 @@ async function runDaemon() {
   console.log('======================================================================');
   console.log('☁️ [AutoBackupDaemon] Atlas -> Google Drive automatski backup servis');
   console.log('======================================================================\n');
-  console.log(`Interval: Svaka 2 sata | Destinacija: ${DEST}\n`);
+  const intervalMinutes = Number(process.env.BACKUP_INTERVAL_MINUTES) || 15;
+  const intervalMs = intervalMinutes * 60 * 1000;
+  console.log(`Interval: Svakih ${intervalMinutes} minuta | Destinacija: ${DEST}\n`);
 
   // Initial immediate backup
   try {
@@ -122,9 +124,9 @@ async function runDaemon() {
     console.error('[AutoBackup Initial Error]', err.message);
   }
 
-  // Continuous 2-hour loop
+  // Continuous 15-minute loop
   while (true) {
-    await delay(2 * 60 * 60 * 1000);
+    await delay(intervalMs);
     try {
       await createAtlasGoogleDriveBackup();
     } catch (err) {
