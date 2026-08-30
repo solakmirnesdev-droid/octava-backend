@@ -23,24 +23,22 @@ npm install
 ---
 
 ### 3. Configure Environment (`.env.dev` or `.env`)
-Ensure your `.env.dev` or `.env` points to your MongoDB instance:
+You can connect directly to the live MongoDB Atlas cloud database:
 ```env
 PORT=4000
 NODE_ENV=development
-MONGODB_URI=mongodb://127.0.0.1:27017/octava
-JWT_SECRET=your_super_secret_jwt_key_here
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:5174
+MONGODB_URI=mongodb+srv://solakmirnes:supermario@cluster0.6lyi2.mongodb.net/octava?retryWrites=true&w=majority&appName=Cluster0
+JWT_SECRET=O0hHN5tvHoWaw8rd4dFZ-quBrK9z9YmlN6kSjFdkz2gbSjUsp9v0XUFu2de0HqGS
+CORS_ORIGIN=http://localhost:3000,http://localhost:8000
 ```
+*(With this Atlas URI, all 16,110 songs and 3,108 artists are immediately live — no manual restore needed!)*
 
 ---
 
-### 4. Restore the Latest Database Snapshot from Google Drive
-A complete, updated snapshot (16,110 songs, 3,108 artists, 100% text-free portraits, 93%+ YouTube video matches) is stored in your Google Drive under:
-`Google Drive / My Drive / octava-backups / octava-latest-direct-ready.ejson.gz`
-
-To restore it into MongoDB on your Desktop PC:
+### 4. Optional: Offline Local MongoDB Restore
+If running an offline local MongoDB instance instead of Atlas:
 ```bash
-node scripts/restore.js "path/to/Google Drive/My Drive/octava-backups/octava-latest-direct-ready.ejson.gz" --into octava --force
+node scripts/restore.js "path/to/octava-latest-direct-ready.ejson.gz" --into octava --force
 ```
 
 ---
