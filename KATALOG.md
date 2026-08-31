@@ -66,6 +66,26 @@ npm run katalog:provjeri            # sve putanje se razrješavaju
 
 **Sve je probno dok ne dodaš `--write`.** To je cijeli sigurnosni model.
 
+### Koja baza — OBAVEZNO PROVJERI
+
+```bash
+node scripts/katalog.js                    # lokalna (.env.dev / .env)
+node scripts/katalog.js --atlas            # ATLAS, produkcija (.env.prod)
+```
+
+Svaka skripta ispisuje bazu u prvom redu. **Ako ne piše `ATLAS`, pišeš
+lokalno.** Baze nisu iste i razišle su se.
+
+**AI-TRAP: nikad `import 'dotenv/config'` u skripti.** Čita samo `.env`, pa
+`--atlas` biva ignorisan i skripta tiho popravlja lokalni katalog dok ti
+misliš da radiš na produkciji. Koristi `connect()` iz `lib/sweep.js`.
+
+**Prije svakog `--write` na Atlas — backup:**
+
+```bash
+node scripts/maintenance/backup.js --atlas
+```
+
 Spisak konkretnih pjesama s jednim nalazom:
 
 ```bash
@@ -245,7 +265,24 @@ dodaj naredbu u `katalog.js`.
 
 ## 7. Šta je urađeno, i šta ostaje
 
-### Urađeno 2026-08-31 (backup prije svega: `octava-2026-08-31T05-27`)
+### Urađeno na ATLASU (produkcija), 2026-08-31
+Backup prije svega: `octava-2026-08-31T03-51-57.ejson.gz`, 26,4 MB.
+
+| korak | učinak |
+|---|---|
+| mehaničke popravke | 4.196 pjesama (3.221 razmaci, 961 oznake, 552 potpisi) |
+| `popravi-oznake` | 600 pjesama, 604 reda |
+| `doctor` | brojači + 31 zastario `searchName` |
+| `skloni-nespremne` | **1.030 pjesama s objave u draft** |
+| `ocjeni` | svih 14.384 |
+
+**Besprijekornih: 3.785 → 5.642 (26,3% → 39,2%).**
+**Objavljenih: 13.537 → 12.507.**
+
+Ostaje na Atlasu: **57 živih duplikat-grupa** (lokalno ih je 0) i 1.065 pjesama
+koje dijele YouTube video. Oboje traži ručnu odluku.
+
+### Urađeno lokalno, 2026-08-31 (backup: `octava-2026-08-31T05-27`)
 
 | korak | učinak |
 |---|---|

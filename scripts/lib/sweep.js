@@ -21,10 +21,57 @@
  * into an indexed lookup over `updatedAt` that usually returns nothing.
  */
 import mongoose from 'mongoose';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const KORIJEN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+/**
+ * Read MONGODB_URI out of one env file, without loading the rest of it.
+ *
+ * AI-DECISION: scripts deliberately do NOT go through src/config/env.js. That
+ * module validates the whole production configuration and refuses to load
+ * when, for example, PAYMENTS_MODE is simulated — a guard that belongs in
+ * front of the running app, not in front of a maintenance script that needs a
+ * connection string and nothing else. Reading one key leaves the guard intact.
+ */
+export function uriIz(datoteka) {
+  const put = path.join(KORIJEN, datoteka);
+  if (!fs.existsSync(put)) return null;
+  const m = /^\s*MONGODB_URI\s*=\s*(.+)$/m.exec(fs.readFileSync(put, 'utf8'));
+  return m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
+}
+
+/**
+ * Connect to the database that was asked for, and say which one out loud.
+ *
+ * Pass --atlas (or OCTAVA_BAZA=atlas) for production. Anything else stays on
+ * the local catalogue.
+ *
+ * AI-TRAP: never `import 'dotenv/config'` in a script. It reads .env and
+ * nothing else, so a script quietly edits the LOCAL catalogue while you
+ * believe you are on Atlas — and the two have drifted apart. Always print the
+ * host: a bulk write to the wrong database is not something to discover
+ * afterwards.
+ */
+/** Which database this invocation is aimed at, and its URI. */
+export function ciljanaBaza() {
+  const atlas = process.argv.includes('--atlas') || process.env.OCTAVA_BAZA === 'atlas';
+  const uri = atlas ? uriIz('.env.prod') : uriIz('.env.dev') || uriIz('.env');
+  return { atlas, uri };
+}
 
 export async function connect() {
   if (mongoose.connection.readyState === 1) return mongoose.connection;
-  await mongoose.connect(process.env.MONGODB_URI);
+
+  const { atlas, uri } = ciljanaBaza();
+  if (!uri) throw new Error(atlas ? 'nema MONGODB_URI u .env.prod' : 'nema MONGODB_URI u .env.dev/.env');
+
+  const host = uri.replace(/^mongodb(\+srv)?:\/\/[^@]*@/, '').split('/')[0];
+  console.log(`  baza: ${/mongodb\.net/.test(uri) ? 'ATLAS (PRODUKCIJA)' : 'lokalno'} — ${host}`);
+
+  await mongoose.connect(uri);
   return mongoose.connection;
 }
 

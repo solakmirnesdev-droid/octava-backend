@@ -32,7 +32,8 @@ import { RULES, judge } from './lib/kvalitet.js';
 import { citajRadnika, mojaDionica } from './lib/dionica.js';
 import { tidyContent } from '../src/utils/tidyContent.js';
 
-const [, , naredba = 'stanje'] = process.argv;
+// The command is the first bare word; everything starting with - is a flag.
+const naredba = process.argv.slice(2).find((a) => !a.startsWith('-')) || 'stanje';
 const WRITE = process.argv.includes('--write');
 const LIMIT = Number(argOf('--limit') || 20);
 const RADNIK = citajRadnika();

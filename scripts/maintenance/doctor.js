@@ -17,7 +17,12 @@
  * entirely. That is not a bug to fix by removing the paths; it is the reason
  * this script needs to exist and be run.
  */
-import 'dotenv/config';
+/*
+ * AI-TRAP: no `dotenv/config` here. It reads .env only, so --atlas would be
+ * ignored and this would repair the LOCAL catalogue while you watch it and
+ * believe it is fixing production. connect() picks the database and prints
+ * which one.
+ */
 import mongoose from 'mongoose';
 import Song from '../../src/models/Song.js';
 import Artist from '../../src/models/Artist.js';
@@ -25,9 +30,10 @@ import Genre from '../../src/models/Genre.js';
 import { extractChords } from '../../src/utils/chords.js';
 import { tidyContent } from '../../src/utils/tidyContent.js';
 import { slugify } from '../../src/utils/slug.js';
+import { connect } from '../lib/sweep.js';
 
 const WRITE = process.argv.includes('--write');
-await mongoose.connect(process.env.MONGODB_URI);
+await connect();
 
 const lyricsOf = (arrangements) => (arrangements || [])
   .filter((a) => !a.deletedAt)

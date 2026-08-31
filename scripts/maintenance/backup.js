@@ -15,7 +15,14 @@
  * Set BACKUP_KEY to a passphrase and keep it somewhere other than the backup:
  * without it the archive cannot be read, including by you.
  */
-import 'dotenv/config';
+import { ciljanaBaza } from '../lib/sweep.js';
+
+/*
+ * AI-TRAP: this used `import 'dotenv/config'`, which reads .env and nothing
+ * else — so `--atlas` was ignored and the backup silently captured the LOCAL
+ * catalogue. Backing up the wrong database before a production write is worse
+ * than not backing up at all, because it looks like a safety net.
+ */
 import { MongoClient } from 'mongodb';
 import { EJSON } from 'bson';
 import { gzipSync } from 'node:zlib';
@@ -24,7 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const URI = process.env.MONGODB_URI;
+const { atlas: NA_ATLASU, uri: URI } = ciljanaBaza();
 const DB_NAME = new URL(URI.replace('mongodb://', 'http://')).pathname.slice(1) || 'octava';
 
 const DRIVE = path.join(
