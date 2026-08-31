@@ -174,9 +174,14 @@ function prevediOznaku(label) {
   return null;
 }
 
+/** A line that is a transcription credit and nothing else. */
+const POTPIS =
+  /\b(akordi|tabovi?|tekst)\s+by\s+[A-ZČĆŠĐŽ]|\b(transkripcij|obradio|priredio)|\b(tekst|muzika|glazba|autor|aranžman|aranzman)\s*:|(https?:\/\/|www\.)/i;
+
 async function popravi() {
   let bezRazmaka = 0;
   let prevedeno = 0;
+  let potpisa = 0;
 
   const r = await sweep({
     model: Song,
@@ -199,6 +204,25 @@ async function popravi() {
         return `${a}[${nova}]${b}`;
       });
 
+      // 3. transcription credits — they belong in a field, not in the lyrics
+      const bezPotpisa = poslije
+        .split('\n')
+        .filter((red) => {
+          if (!POTPIS.test(red)) return true;
+          /*
+           * AI-TRAP: strip the chords before judging the line, and keep any
+           * line longer than nine words. 449 of these credits have chords
+           * injected into them, and a handful are a credit tacked onto a real
+           * lyric line — dropping those would take the lyric with it.
+           */
+          const golo = red.replace(/\[[^\]]*\]/g, '').trim();
+          if (golo.split(/\s+/).length > 9) return true;
+          potpisa++;
+          return false;
+        })
+        .join('\n');
+      poslije = bezPotpisa;
+
       if (poslije === prije) return null;
       return { 'arrangements.0.content': poslije };
     }
@@ -207,6 +231,7 @@ async function popravi() {
   console.log(`\n  pregledano ${r.seen}, za izmjenu ${r.changed}, ${r.ms}ms`);
   console.log(`     razmaci/crtice/interpunkcija : ${bezRazmaka}`);
   console.log(`     prevedene oznake             : ${prevedeno}`);
+  console.log(`     uklonjeni potpisi            : ${potpisa}`);
 
   /*
    * AI-NOTE: kvar-u-oznaci (3,523 songs) is deliberately NOT repaired here.

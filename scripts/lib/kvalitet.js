@@ -55,7 +55,17 @@ export const RULES = [
     weight: 6,
     fix: 'skripta',
     why: 'red akorada slijepljen s oznakom: [Hm][Strofa [G]1]',
-    test: (c) => /\[[A-H][#b]?m?\]\s*\[?\s*(strofa|refren)|\[(strofa|refren)[^\]]*\[/i.test(c)
+    /*
+     * The wreck has a bracket INSIDE the label — [Strofa [G]1] — or a run of
+     * closing brackets, [Strofa]]]]]]]]] [E] 1].
+     *
+     * AI-TRAP: an earlier version also flagged "a chord immediately before a
+     * label" and counted 3,564 songs. 2,609 of those lines were
+     * "[Prelaz / Solo]:" — a perfectly good label that simply carries a colon,
+     * and not a chord in sight. Sampling the matches is what caught it; the
+     * count alone looked like a discovery.
+     */
+    test: (c) => /\[(strofa|refren|uvod|kraj|prelaz)[^\]\n]*\[/i.test(c) || /\[(strofa|refren)\]{2,}/i.test(c)
   },
   {
     id: 'sekcija-bez-akorda',
@@ -85,11 +95,18 @@ export const RULES = [
     id: 'potpis',
     weight: 3,
     fix: 'skripta',
-    why: 'potpis ili izvor u tekstu — pripada polju, ne tekstu',
+    why: 'potpis transkribenta u tekstu — pripada polju, ne tekstu',
+    /*
+     * AI-TRAP: never match "izvor" or "preuzeto". Izvor is an ordinary Bosnian
+     * word — spring, source — and it sings: "kad na izvor ja pođem", "more je
+     * izvor života". With it in the pattern this rule claimed 622 songs and
+     * most of the samples were lyrics. "by" alone is no better: there is a
+     * song called "By pass".
+     */
     test: (c) =>
-      /\bby\s+[A-ZČĆŠĐŽ]/.test(c) ||
+      /\b(akordi|tabovi?|tekst)\s+by\s+[A-ZČĆŠĐŽ]/i.test(c) ||
+      /\b(transkripcij|obradio|priredio)/i.test(c) ||
       /\b(tekst|muzika|autor|aranžman|aranzman)\s*:/i.test(c) ||
-      /\b(obradio|priredio|transkri|preuzeto|izvor)/i.test(c) ||
       /(https?:\/\/|www\.)/i.test(c)
   },
   {
@@ -139,7 +156,13 @@ export const RULES = [
     weight: 1,
     fix: 'skripta',
     why: 'razmak prije zareza ili tačke',
-    test: (c) => /\s+[,.!?;:]/.test(c)
+    /*
+     * AI-TRAP: [ \t], never \s. \s includes the newline, and a line that ends
+     * where the next one opens with punctuation is ordinary in lyrics. With
+     * \s+ this rule reported 896 songs after the repair had already run — 1100
+     * of those hits were line breaks and exactly one was a real space.
+     */
+    test: (c) => /[ \t]+[,.!?;:]/.test(c)
   },
   {
     id: 'ponovljena-sekcija',

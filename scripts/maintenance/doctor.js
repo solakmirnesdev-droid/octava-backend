@@ -104,11 +104,38 @@ for (const a of await Artist.find().select('_id songCount').lean()) {
   }
 }
 
+/*
+ * searchName goes stale whenever an artist is renamed through updateOne or
+ * bulkWrite, because those skip the pre-save hook that derives it. The catalogue
+ * carried 37 of them, still answering to names nobody uses — "zeljko samardzic
+ * test", "dragan kojic keba arr dragan pejovic".
+ *
+ * AI-TRAP: skip names with an apostrophe. slugify turns Dušk'o Kuliš into
+ * "dusk o kulis", splitting the word — the stored "dusko kulis" is better than
+ * anything recomputing produces, and search is an exact match on this field.
+ */
+let imena = 0;
+for (const a of await Artist.find().select('name searchName').lean()) {
+  if (/['\u2019]/.test(a.name)) continue;
+  const tacno = slugify(a.name).replace(/-/g, ' ');
+  if (a.searchName === tacno) continue;
+  imena += 1;
+  if (WRITE) await Artist.updateOne({ _id: a._id }, { $set: { searchName: tacno } });
+}
+
 // ── the half that needs a person ───────────────────────────────────────────
 const living = new Set((await Artist.find().select('_id').lean()).map((a) => String(a._id)));
-const orphans = (await Song.find().select('artist').lean()).filter((s) => !living.has(String(s.artist))).length;
+const orphans = (await Song.find({ deletedAt: null }).select('artist').lean()).filter(
+  (s) => !living.has(String(s.artist))
+).length;
 
+/*
+ * AI-TRAP: soft-deleted rows must be excluded here too. Aggregation skips the
+ * query hook, and the trash holds 1,721 songs — counting them reported 1,200
+ * duplicate groups when the live catalogue has none at all.
+ */
 const duplicates = await Song.aggregate([
+  { $match: { deletedAt: null } },
   { $group: { _id: { t: '$searchTitle', a: '$artist' }, n: { $sum: 1 } } },
   { $match: { n: { $gt: 1 } } },
   { $count: 'groups' }
@@ -122,18 +149,26 @@ console.log('    razmaci u sadrzaju   ', counts.content);
 console.log('    tag bez-akorda       ', counts.tags);
 console.log('    brojaci zanrova      ', genres);
 console.log('    brojaci izvodjaca    ', artists);
+console.log('    zastario searchName  ', imena);
 
 console.log('\n  TRAZI ODLUKU (skripta ne dira)');
 console.log('    pjesme bez izvodjaca ', orphans);
 console.log('    duplikat grupa       ', duplicates[0]?.groups || 0);
 
 const sharedVideos = await Song.aggregate([
-  { $match: { youtubeId: { $nin: [null, ''] } } },
+  { $match: { deletedAt: null, youtubeId: { $nin: [null, ''] } } },
   { $group: { _id: '$youtubeId', n: { $sum: 1 } } },
   { $match: { n: { $gt: 1 } } },
   { $count: 'ids' }
 ]);
+/*
+ * AI-TRAP: match deletedAt: null first. Aggregation does not run the
+ * soft-delete query hook, so without this the count includes 295 artists
+ * already sitting in the trash and reports 228 duplicate groups where the
+ * catalogue actually has two.
+ */
 const sameName = await Artist.aggregate([
+  { $match: { deletedAt: null } },
   { $group: { _id: '$searchName', n: { $sum: 1 } } },
   { $match: { n: { $gt: 1 } } },
   { $count: 'names' }

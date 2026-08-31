@@ -1,74 +1,60 @@
 # KATALOG.md — poliranje Octava kataloga
 
 Radna knjiga za svakog agenta koji nastavlja poliranje ~14.400 pjesama.
-Napisana 2026-08-31. Svi brojevi u njoj su **izmjereni**, ne procijenjeni —
-ako se ne slažu s onim što vidiš, prvo pokreni `npm run katalog` pa vjeruj
-njemu, ne ovom dokumentu.
+Zadnji prolaz: 2026-08-31. Svi brojevi su **izmjereni**, ne procijenjeni — ako
+se ne slažu s onim što vidiš, pokreni `npm run katalog` i vjeruj njemu.
 
-Vlasnik odluka je **Mirnes**. Šta se uvozi i šta se briše je njegov poziv;
-kako se to izvodi je tvoj.
+Vlasnik odluka je **Mirnes**. Šta se uvozi i briše je njegov poziv; kako se to
+izvodi je tvoj.
 
 ---
 
 ## 1. Cilj — „identičan obrazac po svakoj pjesmi"
 
-Svaka pjesma treba imati:
-
-- tačnu notaciju (H sistem, povisilice na izlazu, `Bb` → `A#`)
-- tačnu gramatiku i pravopis
-- bez duplih razmaka u rečenici
-- bez nizova crtica
-- bez tipfelera
-- bez duplikata u katalogu
-- tekst koji se ne lomi i **koji je potpun** — ne fali strofa, ne fale akordi
-  na drugoj strofi
-- svoje sekcije: `[Strofa 1]`, `[Refren]`, `[Strofa 2]`…
-- bez potpisa na kraju (`by Mirnes Solak`)
-- bez capo uputstva na početku teksta — capo ide u **polje**, ne u tekst
-- izvođače bez duplikata, gramatički tačne, u redu **Ime Prezime**
+Svaka pjesma treba imati: tačnu notaciju (H sistem, povisilice na izlazu),
+tačnu gramatiku, bez duplih razmaka, bez nizova crtica, bez tipfelera, bez
+duplikata, potpun tekst koji se ne lomi, svoje sekcije (`[Strofa 1]`,
+`[Refren]`), bez potpisa transkribenta, bez capo uputstva u tekstu (capo ide u
+**polje**), i izvođače bez duplikata, gramatički tačne, u redu **Ime Prezime**.
 
 ---
 
-## 2. Gdje smo — izmjereno stanje
+## 2. Gdje smo
 
-`npm run katalog` daje ovu tabelu uživo. Stanje na 2026-08-31:
+`npm run katalog` daje ovu tabelu uživo. Stanje nakon prolaza 2026-08-31:
 
-**14.388 pjesama ocijenjeno, 1.789 besprijekornih (12,4%).**
+**14.388 pjesama, 5.950 besprijekornih (41,4%).** Prije ovog prolaza bilo je
+1.789 (12,4%).
 
 | nalaz | broj | udio | popravlja |
 |---|---|---|---|
-| `nema-refren` | 7.550 | 52,5% | ručno |
-| `dupli-razmak` | 6.386 | 44,4% | skripta |
-| `kvar-u-oznaci` | 3.523 | 24,5% | skripta *(nije napisana)* |
-| `razmak-prije-znaka` | 2.856 | 19,8% | skripta |
-| `crtice` | 2.079 | 14,4% | skripta |
-| `sekcija-bez-akorda` | 1.381 | 9,6% | ručno |
-| `kratak-tekst` | 1.338 | 9,3% | ručno |
+| `nema-refren` | 7.548 | 52,5% | ručno |
+| `kratak-tekst` | 1.364 | 9,5% | ručno |
 | `prazna-pjesma` | 1.286 | 8,9% | ručno |
-| `potpis` | 622 | 4,3% | skripta |
-| `engleske-oznake` | 265 | 1,8% | skripta |
-| `capo-u-tekstu` | 32 | 0,2% | skripta |
+| `sekcija-bez-akorda` | 1.285 | 8,9% | ručno |
+| `ponovljena-sekcija` | 102 | 0,7% | ručno |
+| `capo-u-tekstu` | 32 | 0,2% | ostavljeno namjerno, §7 |
+| `dupli-razmak` | 27 | 0,2% | rub |
+| `potpis` | 20 | 0,1% | rub |
 | `bez-sekcija` | 15 | 0,1% | ručno |
-| `ponovljena-sekcija` | 5 | 0,0% | ručno |
+| `razmak-prije-znaka` | 1 | 0,0% | rub |
 
-**Katalog je stvarno 13.102 prave pjesme.** Onih 1.286 `prazna-pjesma` su
-ostaci uvoznika: naslov postoji, teksta nema (`{Tekst i akordi još nisu
-upisani.}`). Naduvavaju brojku i kvare pretragu.
+Objavljenih pjesama: **11.904**.
 
 Izvođači, 2.813 ukupno:
 
-| nalaz | broj | šta s tim |
-|---|---|---|
-| moguć obrnut red imena | 26 prijavljeno, **~4 tačna** | samo ručno |
-| ime završava cifrom | 44 | provjeri svaki |
-| višak razmaka | 1 | sitnica |
-| **prave `feat.` saradnje** | **0** | ne postoje, vidi §5 |
+| nalaz | broj |
+|---|---|
+| duplikat imena među živima | **0** |
+| moguć obrnut red imena | 26 prijavljeno, **~4 tačna** |
+| ime završava cifrom | 44 |
+| **prave `feat.` saradnje** | **0** — ne postoje, §5.1 |
 
 ---
 
 ## 3. Kako se radi
 
-Jedan ulaz. Ne biraj među 111 skripti u `scripts/`.
+Jedan ulaz. Ne biraj među 113 skripti u `scripts/`.
 
 ```bash
 npm run katalog                     # izvještaj, ne mijenja ništa
@@ -78,38 +64,36 @@ npm run katalog:ocjeni -- --write   # upiši ocjenu na svaku pjesmu
 npm run katalog:provjeri            # sve putanje se razrješavaju
 ```
 
-**Sve je probno dok ne dodaš `--write`.** To je cijeli sigurnosni model —
-nemoj pisati naredbu koja ga zaobilazi.
+**Sve je probno dok ne dodaš `--write`.** To je cijeli sigurnosni model.
 
-Za spisak konkretnih pjesama s jednim nalazom:
+Spisak konkretnih pjesama s jednim nalazom:
 
 ```bash
 node scripts/maintenance/quality.js --list sekcija-bez-akorda --limit 40
+```
+
+Ostale, zasebne popravke:
+
+```bash
+node scripts/maintenance/doctor.js --write            # izvedena polja
+node scripts/maintenance/popravi-oznake.js --write    # akord slijepljen s oznakom
+node scripts/maintenance/skloni-nespremne.js --write  # prazne i siročad -> draft
 ```
 
 ### Paralelni rad — dionice
 
 ```bash
 node scripts/katalog.js popravi --radnik 1/4
-node scripts/katalog.js popravi --radnik 2/4
-node scripts/katalog.js popravi --radnik 3/4
-node scripts/katalog.js popravi --radnik 4/4
 ```
 
-Četiri dionice su **disjunktne i izmjereno ravnomjerne**: 3597 | 3597 | 3597 |
+Četiri dionice su disjunktne i izmjereno ravnomjerne: 3597 | 3597 | 3597 |
 3598, nula preklapanja, zbir tačno 14.389.
 
-**AI-TRAP — ne dijeli „od vrha prema sredini" i „od sredine prema vrhu".** To
-je ista polovina dvaput, s dva radnika koji se sudaraju na svakom zapisu.
-Dionice su susjedni `_id` rasponi rezani na izmjerenim kvantilima: disjunktne
-po konstrukciji, koriste `_id` indeks, i ravnomjerne su iako su ObjectId-evi
-zgusnuti tamo gdje je uvoz išao brzo.
+**AI-TRAP: ne dijeli „od vrha prema sredini" i „od sredine prema vrhu".** To je
+ista polovina dvaput, s dva radnika koji se sudaraju na svakom zapisu.
 
-**Za skripte paralelizam NIJE potreban.** Cijeli mehanički prolaz kroz
-14.388 pjesama traje **552ms** (izmjereno, batch 1000). Četiri procesa da se
-uštedi 400 milisekundi donose sudare u pisanju i djelimične greške bez ikakve
-koristi. Dionice postoje za **agentski rad** — kad četiri Gemini sesije
-poliraju tekstove i ne smiju dirati istu pjesmu.
+**Za skripte paralelizam nije potreban** — cijeli prolaz traje ~600ms. Dionice
+postoje za **agentski rad**, kad više sesija polira tekstove.
 
 ---
 
@@ -118,80 +102,107 @@ poliraju tekstove i ne smiju dirati istu pjesmu.
 | fajl | uloga |
 |---|---|
 | `scripts/katalog.js` | jedini ulaz; sve naredbe |
-| `scripts/lib/kvalitet.js` | 13 pravila kvaliteta, čista funkcija, bez baze |
-| `scripts/lib/sweep.js` | prolaz kroz bazu: kursor, `.lean()`, `bulkWrite`, vodomjer |
-| `scripts/lib/dionica.js` | podjela na disjunktne dionice |
+| `scripts/lib/kvalitet.js` | 13 pravila, čista funkcija bez baze |
+| `scripts/lib/sweep.js` | prolaz: kursor, `.lean()`, `bulkWrite`, vodomjer |
+| `scripts/lib/dionica.js` | disjunktne dionice |
 | `scripts/lib/potvrdi.js` | brava ispred skripti koje trajno brišu |
-| `src/utils/tidyContent.js` | čišćenje razmaka/crtica; **ne dira redove koji su samo akordi** |
-| `scripts/maintenance/quality.js` | spisak konkretnih pjesama po nalazu |
-| `scripts/maintenance/doctor.js` | popravlja izvedena polja (`searchTitle`, `searchLyrics`, brojači) |
+| `src/utils/tidyContent.js` | razmaci i crtice; **ne dira redove akorada** |
+| `scripts/maintenance/doctor.js` | izvedena polja i brojači |
+| `scripts/maintenance/popravi-oznake.js` | akord slijepljen s oznakom |
+| `scripts/maintenance/skloni-nespremne.js` | prazne i siročad → draft |
+| `scripts/maintenance/quality.js` | spisak pjesama po nalazu |
 
-Novo pravilo se dodaje **samo** u `scripts/lib/kvalitet.js`. Ne piši ga u
-skripte — obje ga čitaju odatle.
+Novo pravilo ide **samo** u `scripts/lib/kvalitet.js`.
 
 ---
 
 ## 5. Zamke — izmjerene, ne pretpostavljene
 
-Ovo nisu mišljenja. Svaka je nastala tako što je mehaničko pravilo prijavilo
-zdrave podatke kao pokvarene, na ovim podacima, u ovoj bazi. **Šest puta u
-jednoj sesiji.** Zato: prvo uzorak, pa tvrdnja.
+**Ovo je najvažnija sekcija u dokumentu.** Tokom jednog jedinog prolaza kroz
+katalog, **deset** mehaničkih pravila prijavilo je zdrave podatke kao
+pokvarene. Svako je izgledalo očigledno tačno. Pravilo: **prvo uzorak, pa
+tvrdnja.** Broj sam po sebi nije nalaz.
 
 ### 5.1 „X i Y" nisu saradnje nego imena bendova
-Regex ` i ` prijavi 152 „saradnje". Prave `feat.` saradnje: **0**. `ft.`: 0.
-` x `: 0. Ono što regex hvata su bendovi — *Bajaga i Instruktori*, *Leb i Sol*,
-*Goran Bare i Majke*, *Kanda Kodža i Nebojša*, *Đura i Mornari*. Skripta koja
-ih „razdvaja" napravila bi lažne izvođače *Instruktori*, *Sol*, *Majke* i
-uništila **211 imena**. Isto vrijedi za `&`: *Darko Rundek & Cargo Orkestar*.
-
-**Pravilo: saradnje se rješavaju bijelom listom, nikad regexom.**
+Regex ` i ` prijavi 152 „saradnje". Pravih `feat.` saradnji: **0**. `ft.`: 0.
+` x `: 0. Ono što hvata su bendovi — *Bajaga i Instruktori*, *Leb i Sol*,
+*Goran Bare i Majke*, *Đura i Mornari*. Razdvajanje bi napravilo lažne izvođače
+*Instruktori*, *Sol*, *Majke* i uništilo **211 imena**. Isto vrijedi za `&`:
+*Darko Rundek & Cargo Orkestar*. **Saradnje se rješavaju bijelom listom.**
 
 ### 5.2 Ne spajaj izvođače po skinutim ciframa
-Normalizacija koja skida cifru s kraja spoji *Grupa 777* s *Grupa 220*, i
-*357* s *058*. To su različiti bendovi. Od 7 prijavljenih grupa duplikata
-stvarna su **dva**: `Zdravko Čolić 2010`, `Gibonni 2010`.
+Normalizacija koja skida cifru spoji *Grupa 777* s *Grupa 220*, i *357* s
+*058*. Različiti bendovi.
 
 ### 5.3 Obrnut red imena se ne ispravlja automatski
-Heuristika „prvi token liči na prezime" prijavi 26, tačna su ~4
-(*Bešlić Halid*, *Balašević Đorđe*, *Badrić Nina*, *Tadić Vlatko*). Ostalo su
-bendovi — *Kraljevski Apartman*, *Beogradski Sindikat*, *Bosutski Bečari* — i
-**Eric Clapton**, kojeg heuristika smatra prezimenom.
+Heuristika prijavi 26, tačna su ~4 (*Bešlić Halid*, *Balašević Đorđe*,
+*Badrić Nina*, *Tadić Vlatko*). Ostalo su bendovi — *Kraljevski Apartman*,
+*Beogradski Sindikat* — i **Eric Clapton**, kojeg heuristika smatra prezimenom.
 
-### 5.4 Capo se seli, ne briše
-`Song` ima capo polje. „Capo 2" je stvarna informacija.
-I: `/capo|kapo/` hvata „kap**om**", „kap**one**" i svaki padež imenice *kapa* —
-prijavi 52, stvarno je **40**.
+### 5.4 `/capo|kapo/` hvata imenicu *kapa*
+„kap**om**", „kap**one**", svaki padež. Prijavi 52, stvarno je 40. Koristi
+granicu riječi. I: **capo se seli u polje, ne briše** — `[G]capo na [D]1. polju`
+je stvarna informacija.
 
 ### 5.5 Dupli razmak u redu akorada je nosiv
-`[Am]   [F]   [C]` — razmak drži akord iznad sloga. `tidyContent` zato
-preskače redove koji su samo akordi. Ne uklanjaj tu provjeru.
+`[Am]   [F]   [C]` — razmak drži akord iznad sloga. `tidyContent` preskače
+redove koji su samo akordi. Ne uklanjaj tu provjeru.
 
 ### 5.6 Akord i oznaka sekcije imaju istu sintaksu
-`[Strofa 2]` i `[Am]` su oboje zagrade. Zamijeni ih u jednom smjeru i svaka
-pjesma izgleda strukturirano; u drugom — svaka izgleda bez akorada. Testiraj
-akord protiv `CHORD` regexa iz `kvalitet.js`.
+`[Strofa 2]` i `[Am]` su oboje zagrade. Testiraj protiv `CHORD` regexa iz
+`kvalitet.js`.
 
-### 5.7 Akorde traži BILO GDJE u strofi, ne na početku reda
+### 5.7 Akorde traži BILO GDJE u strofi
 Katalog je inline ChordPro: `ja [Am]sam`. Pravilo koje traži akord na početku
-reda prijavi **85%** kataloga kao „bez akorada"; istina je **9,6%**.
+reda prijavi **85%** kataloga kao „bez akorada"; istina je 9%.
 
 ### 5.8 Ponovljen `[Refren]` je ispravan
 Refren se pjeva dvaput. Pravilo koje prijavljuje svaku ponovljenu oznaku
-osudilo je **3.717 ispravnih pjesama**. Broji samo ponovljene **numerisane**
-oznake — pravih je 5.
+osudilo je **3.717 ispravnih pjesama**. Broji samo ponovljene **numerisane**.
 
-### 5.9 `select('arrangements.0.content')` ne radi
-MongoDB **nema projekciju po indeksu niza**. Taj put tumači kao polje po imenu
-`0`, ne nađe ga, i vrati `[{}]` — bez greške i bez upozorenja. Skripta onda
-vidi prazan tekst i zaključi da je sve ispravno. Koristi
-`select('arrangements.content')`.
+### 5.9 `[Prelaz / Solo]:` je ispravna oznaka
+Pravilo za „akord slijepljen s oznakom" prijavilo je **3.564 pjesme**. Od toga
+su **2.609 redova bili `[Prelaz / Solo]:`** — zdrava oznaka s dvotačkom, bez
+ijednog akorda. Stvarni kvar je bio 600. Uzorkovanje je to uhvatilo; broj je
+izgledao kao otkriće.
 
-**`$set` po indeksu RADI** — `{$set: {'arrangements.0.content': x}}` je ispravno
-i ne dira ostale aranžmane. Provjereno.
+### 5.10 „izvor" je riječ iz pjesme, ne atribucija
+Pravilo za potpise hvatalo je `izvor` i prijavilo 622 pjesme. *„kad na izvor ja
+pođem"*, *„More je izvor života"* — to je tekst. Ni `by` nije bezopasan: postoji
+pjesma **By pass**.
 
-### 5.10 `npm run katalog popravi` ne prosljeđuje riječ
-npm traži `--` prije argumenata. Zato svaka naredba ima svoj npm ulaz.
-Direktni oblik radi normalno: `node scripts/katalog.js popravi --write`.
+### 5.11 `\s` hvata i prelom reda
+Pravilo `/\s+[,.!?;:]/` prijavilo je 896 pjesama nakon što je popravka već
+prošla. Od 1.101 pogotka, **1.100 su bili prelomi reda**, a jedan pravi razmak.
+Koristi `[ \t]`.
+
+### 5.12 Agregacija ne pokreće soft-delete hook
+**Ovo je zavaralo tri brojača odjednom.** `Model.aggregate()` ne primjenjuje
+query middleware, pa broji i ono što je u kanti. Bez `$match: { deletedAt: null }`
+doktor je prijavljivao **1.200 grupa duplikata** (živih: **0**), **228 istih
+imena izvođača** (živih: **0**), i naduvane siročadi. U kanti je 1.721 pjesma i
+295 izvođača. **Uvijek `$match` prvi.**
+
+### 5.13 `select('arrangements.0.content')` ne radi
+MongoDB **nema projekciju po indeksu niza** — vraća `[{}]`, bez greške. Skripta
+onda vidi prazan tekst i zaključi da je sve ispravno. Koristi
+`arrangements.content`. **`$set` po indeksu RADI** i ne dira ostale aranžmane.
+
+### 5.14 Mongoose tiho odbacuje polja kojih nema u šemi
+Ocjenjivač je pisao u `quality` prije nego je polje postojalo u `Song.js`.
+Nema greške, nema upozorenja — prijavi 14.388 uspješnih upisa i ne promijeni
+ništa. **Prvo deklariši polje.**
+
+### 5.15 `searchName` zastari jer hook ne radi na `updateOne`
+Pre-save hook računa `searchName` samo pri `save()`. Preimenovanja kroz
+`updateOne`/`bulkWrite` ga zaobilaze, pa je 37 izvođača nosilo tuđe ime —
+*Željko Samardžić* je imao `"zeljko samardzic test"`. **Ali ne preračunavaj
+slijepo:** `Dušk'o Kuliš` ima `"dusko kulis"`, a slugify daje `"dusk o kulis"` —
+apostrof cijepa riječ i to je **gore**. Preskoči imena s apostrofom.
+
+### 5.16 `npm run katalog popravi` ne prosljeđuje riječ
+npm traži `--` prije argumenata. Direktni oblik radi:
+`node scripts/katalog.js popravi --write`.
 
 ---
 
@@ -200,81 +211,75 @@ Direktni oblik radi normalno: `node scripts/katalog.js popravi --write`.
 Tri skripte trajno brišu podatke i **niko ih ne poziva**. Traže
 `OCTAVA_DOZVOLI_RUSENJE=DA`:
 
-- `scripts/fixes/revert_all_to_original.js` — vraća sve kolekcije iz snimka
+- `scripts/fixes/revert_all_to_original.js` — vraća kolekcije iz snimka
 - `scripts/fixes/clean_revert_final.js` — briše kolekcije pa vraća backup
-- `scripts/healers/heal_nonexistent_and_foreign_artists.js` — `deleteMany`
-  koji zaobilazi kantu i modal `SIGURAN SAM`
+- `scripts/healers/heal_nonexistent_and_foreign_artists.js` — `deleteMany` koji
+  zaobilazi kantu i modal `SIGURAN SAM`
 
-Prve dvije su legitimne restore skripte — zato su zaključane, a ne obrisane.
+Prve dvije su legitimne restore skripte — zato zaključane, ne obrisane.
 **Ako ti se čini da ti treba jedna od njih, ne treba ti.** Pitaj Mirnesa.
 
 U `scripts/` je **31 skripta koju niko ne poziva** i **19 s beskonačnom
-petljom**. Ne pokreći ih po imenu. Ako ti treba nešto što `katalog.js` ne
-radi — dodaj naredbu u `katalog.js`.
+petljom.** Ne pokreći ih po imenu. Ako ti treba nešto što `katalog.js` ne radi —
+dodaj naredbu u `katalog.js`.
 
 ---
 
-## 7. Red posla — nastavi ovdje
+## 7. Šta je urađeno, i šta ostaje
 
-### Korak 1 — mehaničko, čeka Mirnesovo odobrenje
-```bash
-npm run katalog:popravi -- --write
-```
-**8.188 pjesama**, ~550ms. Skida `dupli-razmak`, `crtice`,
-`razmak-prije-znaka`, `engleske-oznake`. Sigurno je: `tidyContent` ne dira
-redove akorada.
+### Urađeno 2026-08-31 (backup prije svega: `octava-2026-08-31T05-27`)
 
-### Korak 2 — ocjene na disk
-```bash
-npm run katalog:ocjeni -- --write
-```
-Upiše `quality.score` i `quality.flags` na svaku pjesmu, pa dashboard može
-imati red „traži pažnju", najgore prvo.
+| korak | učinak |
+|---|---|
+| `popravi --write` | 8.188 pjesama: razmaci, crtice, interpunkcija |
+| prevod oznaka | 789 `[Chorus]`/`[Verse]` → `[Refren]`/`[Strofa]` |
+| `popravi-oznake --write` | **600 pjesama**, 604 reda; provjereno: **0 akorada izgubljeno** |
+| uklanjanje potpisa | 555 redova transkribenata (uklj. jednu tuđu e-mail adresu) |
+| `doctor --write` | searchTitle 1.052, akordi 1.592, searchLyrics 4.497, tagovi 609, `searchName` 31 |
+| `ocjeni --write` | ocjena na svih 14.388 |
+| `skloni-nespremne --write` | 90 pjesama s objave u draft (11 praznih, 79 siročadi) |
 
-### Korak 3 — `kvar-u-oznaci`, 3.523 pjesme (NIJE NAPISANO)
-Najveći strukturni kvar. Izgleda ovako:
+**Besprijekornih: 1.789 → 5.950.**
 
-```
-[Strofa 1]
-[Hm][Strofa [G]1]     [D]       [A]     ← red akorada slijepljen s oznakom
-```
+### Ostaje
 
-Red akorada je spojen s oznakom sekcije, a jedan akord je upao **unutar**
-zagrade. Namjerno nije automatizovano: raspetljavanje znači odlučiti koji
-akord ide iznad kojeg sloga, a pogrešna pretpostavka **tiho pomjeri akorde u
-četvrtini kataloga**. Traži zasebnu skriptu i uzorak od bar 30 pjesama
-pregledanih ručno prije `--write`.
+**Korak 1 — `sekcija-bez-akorda` (1.285) i `kratak-tekst` (1.364).**
+Traži sadržaj, ne čišćenje. **Ne izmišljaj tekst ni akorde.** Radi po dionicama.
 
-### Korak 4 — 1.286 praznih pjesama
-Naslov bez teksta. Odluka je Mirnesova: napuniti ili skinuti s objave.
-**Ne izmišljaj tekst.**
+**Korak 2 — `nema-refren` (7.548).** Provjeri je li refren neoznačen ili pjesma
+nema refren. Oboje postoji; ovo nije automatski popravljivo.
 
-### Korak 5 — 1.164 grupe duplikata
-Čeka pravilo od Mirnesa: koja verzija pobjeđuje — starija, ona s više pregleda,
-ili ona s dužim tekstom? Bez tog odgovora spajanje je pogađanje.
+**Korak 3 — `prazna-pjesma` (1.286).** Naslov bez teksta. **1.275 je već u
+draftu**, ne vide se javno; 11 objavljenih je sklonjeno. Odluka je Mirnesova:
+napuniti ili obrisati.
 
-### Korak 6 — ručni red
-`sekcija-bez-akorda` (1.381), `kratak-tekst` (1.338), `nema-refren` (7.550).
-Radi po dionicama (§3) da se sesije ne sudaraju. Kod `nema-refren` provjeri
-prvo je li refren stvarno neoznačen ili pjesma nema refren — oboje postoji.
+**Korak 4 — `capo-u-tekstu` (32).** Namjerno neautomatizovano: uzorak pokazuje
+da su pomiješani s pravim uputama za sviranje („svira samo ton B na bas žici,
+8. prag"), pa bi automatsko uklanjanje pojelo stvarnu informaciju. Ručno, ili
+uz parser koji seli u capo polje.
+
+**Korak 5 — `ponovljena-sekcija` (102).** Prevod oznaka ih je otkrio: pjesme s
+`Strofa 2 | Strofa 2 | Strofa 2`. Ponekad je namjerno ponavljanje, ponekad
+pokvarena numeracija — mora se pogledati.
+
+**Korak 6 — 1.061 pjesama dijeli YouTube video.** Ponekad ispravno (splet
+uživo), ponekad pogrešno dodijeljen video. Ručno.
+
+### Šta NE treba raditi
+
+- **Duplikati pjesama: 0 živih grupa.** Onih 1.164/1.200 iz ranijih izvještaja
+  bili su artefakt agregacije koja broji kantu (§5.12). Nema šta da se spaja.
+- **Duplikati izvođača: 0 živih.** Nakon popravke `searchName` nijedna grupa
+  nije ostala.
 
 ---
 
-## 8. Šta se NE dira
+## 8. Šta se ne dira
 
 - **Skreperi.** Povlače tuđe tekstove i transkripcije. Ne dorađuju se.
-- **Tekstovi pjesama se ne izmišljaju.** Ako fali strofa, fali — to je
-  pribavljanje sadržaja, ne čišćenje.
-- **Baza se ne dira bez `--write`,** a `--write` na 14.000 redova je
-  Mirnesova odluka, ne tvoja.
+- **Tekstovi se ne izmišljaju.** Ako fali strofa, fali.
+- **Baza se ne dira bez `--write`,** a `--write` na 14.000 redova je Mirnesova
+  odluka.
+- **Backup prije svakog masovnog upisa.** `npm run backup`.
 - **Ništa se ne stageuje i ne commituje.** Mirnes pregleda svaki diff u VS
   Code. Nikad `git add`, nikad commit, nikad `git push` bez izričitog „da".
-
----
-
-## 9. Otvorena pitanja za Mirnesa
-
-1. Pustiti `popravi --write` na 8.188 pjesama?
-2. Pravilo za spajanje duplikata (1.164 grupe)?
-3. Šta s 1.286 praznih — puniti ili skinuti s objave?
-4. Obrisati 31 skriptu koju niko ne poziva, ili ih ostaviti zaključane?

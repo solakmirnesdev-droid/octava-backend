@@ -73,6 +73,22 @@ const songSchema = new mongoose.Schema(
      * index can only be built over a stored field.
      */
     searchLyrics: { type: String, default: '' },
+
+    /*
+     * How far this song is from the house pattern. Written by
+     * `npm run katalog:ocjeni`, read by the dashboard to order the worklist
+     * worst-first. 100 is spotless; `flags` names each finding.
+     *
+     * AI-TRAP: this has to exist here. Mongoose drops unknown paths from an
+     * update without a word, so a scorer writing to a field the schema does
+     * not declare reports thousands of successful writes and changes nothing.
+     */
+    quality: {
+      score: { type: Number, min: 0, max: 100 },
+      flags: { type: [String], default: undefined },
+      checkedAt: { type: Date }
+    },
+
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true, index: true },
 
     arrangements: {
