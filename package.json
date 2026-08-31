@@ -13,7 +13,11 @@
     "backup": "node scripts/maintenance/backup.js",
     "restore": "node scripts/maintenance/restore.js",
     "test": "node --test test/*.test.js",
-    "test:watch": "node --test --watch test/*.test.js"
+    "test:watch": "node --test --watch test/*.test.js",
+    "katalog": "node scripts/katalog.js stanje",
+    "katalog:ocjeni": "node scripts/katalog.js ocjeni",
+    "katalog:popravi": "node scripts/katalog.js popravi",
+    "katalog:provjeri": "node scripts/katalog.js provjeri"
   },
   "keywords": [
     "guitar",

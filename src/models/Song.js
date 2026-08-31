@@ -3,6 +3,7 @@ import { announce } from '../realtime/changes.js';
 import { uniqueSlug, slugify } from '../utils/slug.js';
 import { toLatin, hasCyrillic } from '../utils/latinise.js';
 import { extractChords } from '../utils/chords.js';
+import { tidyContent } from '../utils/tidyContent.js';
 
 /**
  * One playable version of a song.
@@ -218,6 +219,20 @@ songSchema.pre('validate', async function (next) {
       living[0].isPrimary = true;
     }
   }
+  /*
+   * Tidied before anything reads it.
+   *
+   * AI-DECISION: here, not in each importer. Twenty-odd scripts write songs and
+   * every one of them would have to remember; the hook is the single door they
+   * all pass through. Measured before this existed: 46% of the catalogue
+   * carried doubled spaces inside lyric lines and 13% carried runs of dashes,
+   * none of it deliberate.
+   *
+   * AI-TRAP: insertMany skips this hook, as seedDummySongs already notes. A
+   * bulk insert still needs to tidy on its own.
+   */
+  this.arrangements?.forEach((a) => { a.content = tidyContent(a.content); });
+
   // Keep the chord index in step with the content on every save.
   this.arrangements?.forEach((a) => { a.chords = extractChords(a.content); });
 

@@ -1,5 +1,8 @@
 # AI-NOTES — octava-backend
 
+> **Poliranje kataloga:** radna knjiga je [KATALOG.md](./KATALOG.md) —
+> izmjereno stanje, red posla i zamke. Ulaz u alat je `npm run katalog`.
+
 > **Entry file for every AI session on this project.** Read this first, before
 > touching any code. Update it before you finish. It exists because context
 > windows end and sessions reset — this file is the memory that survives.

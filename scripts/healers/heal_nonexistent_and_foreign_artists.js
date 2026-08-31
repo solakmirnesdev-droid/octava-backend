@@ -6,6 +6,9 @@ import '../../src/models/Artist.js';
 import Artist from '../../src/models/Artist.js';
 import Song from '../../src/models/Song.js';
 import { generateStudioAvatar } from './artist_portrait_enricher.js';
+import { potvrdi } from '../lib/potvrdi.js';
+
+potvrdi('Song.deleteMany() — tvrdo briše pjesme, zaobilazi kantu i modal SIGURAN SAM');
 
 const INVERSIONS = [
   { matchArtist: /^No[cć]as Mi Srce Pati$/i, realArtist: 'Toma Zdravković', realTitle: 'Noćas mi srce pati' },

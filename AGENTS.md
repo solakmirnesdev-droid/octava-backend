@@ -67,6 +67,69 @@ workflow. Before writing any UI:
 
 ---
 
+## Rad s katalogom — čitaj prije nego dodirneš `scripts/`
+
+**Puna radna knjiga je [KATALOG.md](./KATALOG.md)** — izmjereno stanje svih
+14.400 pjesama, red posla, i devet izmjerenih zamki. Pročitaj je prije nego
+napišeš ijedno pravilo. Ovo ispod je sažetak.
+
+Katalog ima ~14.400 pjesama. `scripts/` ima **111 fajlova, 31 od kojih niko ne
+poziva.** Ne biraj među njima. Postoji jedan ulaz:
+
+```bash
+npm run katalog                     # izvještaj o stanju, ne mijenja ništa
+npm run katalog:popravi             # mehaničke popravke, probni prolaz
+npm run katalog:popravi -- --write  # primijeni ih
+npm run katalog:ocjeni -- --write   # upiši ocjenu na svaku pjesmu
+npm run katalog:provjeri            # sve putanje se razrješavaju
+```
+
+**Sve je probno dok ne dodaš `--write`.** To je cijeli sigurnosni model — ne
+piši naredbu koja ga zaobilazi.
+
+Za paralelan rad više sesija — disjunktne dionice, bez preklapanja:
+
+```bash
+node scripts/katalog.js popravi --radnik 1/4
+```
+
+Ne dijeli posao „od vrha prema sredini" i „od sredine prema vrhu" — to je ista
+polovina dvaput. Skriptama paralelizam ionako ne treba: cijeli prolaz kroz
+14.388 pjesama traje 552ms.
+
+Pravila kvaliteta su u `scripts/lib/kvalitet.js`. Zajednički prolaz kroz bazu
+je `scripts/lib/sweep.js` — kursor, `.lean()`, `bulkWrite`, i vodomjer da
+demoni ne prelistavaju cijeli katalog svakih deset sekundi.
+
+### Šta NE radi automatski
+
+Ovo su izmjerene zamke, ne mišljenja. Svaka je nastala tako što je mehaničko
+pravilo prijavilo zdrave podatke kao pokvarene:
+
+| ne radi ovo | zašto |
+|---|---|
+| ne razdvajaj „X i Y" u dva izvođača | to su **imena bendova** — *Bajaga i Instruktori*, *Leb i Sol*. U katalogu ima **nula** pravih `feat.` saradnji, a ovo bi uništilo 211 imena. |
+| ne spajaj izvođače po skinutim ciframa | *Grupa 777* ≠ *Grupa 220*, *357* ≠ *058*. |
+| ne ispravljaj „obrnut red imena" sam | heuristika prijavi 26, tačna su četiri. *Eric Clapton* joj je „prezime prvo". |
+| ne briši `capo` iz teksta | `Song` ima capo polje — informacija se **seli**, ne uklanja. |
+| ne diraj razmake u redovima koji su samo akordi | `[Am]   [F]` — razmak drži akord iznad sloga. |
+| ne popravljaj `kvar-u-oznaci` napamet | 3.523 pjesme; pogrešna pretpostavka tiho pomjera akorde četvrtini kataloga. |
+| ne piši `select('arrangements.0.content')` | MongoDB nema projekciju po indeksu niza — vraća `[{}]`, bez greške. Koristi `arrangements.content`. (`$set` po indeksu **radi**.) |
+
+### Zaključane skripte
+
+Tri skripte trajno brišu podatke i niko ih ne poziva. Traže
+`OCTAVA_DOZVOLI_RUSENJE=DA`:
+
+- `fixes/revert_all_to_original.js`, `fixes/clean_revert_final.js` — vraćanje
+  iz backupa; ruše kolekcije prije upisa.
+- `healers/heal_nonexistent_and_foreign_artists.js` — `deleteMany` koji
+  zaobilazi kantu i modal `SIGURAN SAM`.
+
+Ako ti se čini da ti treba jedna od njih — ne treba ti. Pitaj Mirnesa.
+
+---
+
 ## Model routing
 
 | Task | Model |
