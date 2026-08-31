@@ -150,6 +150,23 @@ songSchema.pre('validate', async function (next) {
   for (const arrangement of this.arrangements || []) {
     if (hasCyrillic(arrangement.content)) arrangement.content = toLatin(arrangement.content);
     if (hasCyrillic(arrangement.label)) arrangement.label = toLatin(arrangement.label);
+    if (arrangement.content) {
+      // Layer 6: Normalize flats to sharps (# notation)
+      arrangement.content = arrangement.content
+        .replace(/\[([A-G])b([^\]]*)\]/g, (m, root, rest) => {
+          const map = { C: 'H', D: 'C#', E: 'D#', F: 'E', G: 'F#', A: 'G#', B: 'A#' };
+          return `[${map[root] || root}${rest}]`;
+        });
+      // Layer 6: Anti-overlap and bracket heal
+      arrangement.content = arrangement.content
+        .replace(/\[\[+([A-H][b#]?[^\]]*)\]\]+/g, '[$1]')
+        .replace(/\[([A-H][b#]?[^\]]*)\s*\[([A-H][b#]?[^\]]*)\]\]/g, '[$1] [$2]')
+        .replace(/\[([A-H][b#]?[^\]]*)\]\s+\[\1\]/g, '[$1]')
+        .replace(/([,\.\!\?\:\;])\[([A-H][b#]?[^\]]*)\]/g, '$1 [$2]');
+      while (/\[([A-H][b#]?[^\]]*)\]\[([A-H][b#]?[^\]]*)/.test(arrangement.content)) {
+        arrangement.content = arrangement.content.replace(/\[([A-H][b#]?[^\]]*)\]\[([A-H][b#]?[^\]]*)/g, '[$1] [$2]');
+      }
+    }
   }
   if (this.tags?.length) this.tags = this.tags.map(toLatin);
 

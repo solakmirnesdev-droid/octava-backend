@@ -27,7 +27,9 @@ const suite = (process.argv[1] || 'unknown')
  * tests errors at `before`. The credentials come from .env; only the database
  * name is swapped, so a test run still cannot touch real data.
  */
-const ENV = new URL('../.env', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+
+const ENV = fileURLToPath(new URL('../.env', import.meta.url));
 const base = (await import('node:fs')).readFileSync(ENV, 'utf8')
   .split('\n').find((line) => line.startsWith('MONGODB_URI='))?.slice('MONGODB_URI='.length).trim();
 

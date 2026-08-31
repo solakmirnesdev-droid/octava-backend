@@ -45,6 +45,116 @@ export function snapChordsToSyllables(line) {
   return result;
 }
 
+export function healOverlappingAndBrokenChords(content) {
+  if (!content) return '';
+  let text = content;
+
+  // 1. Fix nested or double brackets: [[Am]] -> [Am], [[[C]]] -> [C], [Am [G]] -> [Am] [G]
+  text = text.replace(/\[\[+([A-H][b#]?[^\]]*)\]\]+/g, '[$1]');
+  text = text.replace(/\[([A-H][b#]?[^\]]*)\s*\[([A-H][b#]?[^\]]*)\]\]/g, '[$1] [$2]');
+  text = text.replace(/\[\[([A-H][b#]?[^\]]*)\s*([A-H][b#]?[^\]]*)\]/g, '[$1] [$2]');
+
+  // 2. Fix adjacent stuck chords: [Am][F] -> [Am] [F], [Am][G][Em] -> [Am] [G] [Em]
+  while (/\[([A-H][b#]?[^\]]*)\]\[([A-H][b#]?[^\]]*)/.test(text)) {
+    text = text.replace(/\[([A-H][b#]?[^\]]*)\]\[([A-H][b#]?[^\]]*)/g, '[$1] [$2]');
+  }
+
+  // 3. Deduplicate exact same repeated adjacent chords: [Am] [Am] -> [Am]
+  text = text.replace(/\[([A-H][b#]?[^\]]*)\]\s+\[\1\]/g, '[$1]');
+
+  // 4. Fix punctuation sticking directly to chord start without space: "tekst,[Am]" -> "tekst, [Am]"
+  text = text.replace(/([,\.\!\?\:\;])\[([A-H][b#]?[^\]]*)\]/g, '$1 [$2]');
+
+  // 5. Fix stuck chord before opening section header: "[Am][Refren]" -> "[Am]\n[Refren]"
+  text = text.replace(/\[([A-H][b#]?[^\]]*)\]\[(Strofa|Refren|Intro|Uvod|Solo|Outro|Prelaz|Pred-refren)/gi, '[$1]\n[$2]');
+
+  // 6. Ensure standalone chord lines have clean single spaces between chords
+  const lines = text.split('\n');
+  const cleaned = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return '';
+    // Standalone chords line (e.g. intro/solo)
+    if (/^(?:\[[A-H][b#]?[^\]]*\]\s*)+$/.test(trimmed)) {
+      const chords = [...trimmed.matchAll(/\[([A-H][b#]?[^\]]*)\]/g)].map(m => `[${m[1].trim()}]`);
+      return chords.join(' ');
+    }
+    return line;
+  });
+
+  return cleaned.join('\n');
+}
+
+export function enforceHarmonicStanzaSymmetry(content) {
+  if (!content) return '';
+  const sections = content.split(/\n\s*\n/);
+  
+  // Find Stanza 1 chord matrix
+  let stanza1Matrix = [];
+  for (const sec of sections) {
+    const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length > 0 && /^\[Strofa\s*1\]/i.test(lines[0])) {
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        const chordMatches = [...line.matchAll(/\[([A-H][b#]?[^\]]*)\]/g)];
+        const textOnly = line.replace(/\[[^\]]+\]/g, '');
+        const chordPositions = chordMatches.map(m => ({
+          chord: m[1],
+          ratio: textOnly.length > 0 ? (m.index / Math.max(1, line.length)) : 0
+        }));
+        stanza1Matrix.push(chordPositions);
+      }
+      break;
+    }
+  }
+
+  if (stanza1Matrix.length === 0) return content;
+
+  // Apply matrix to subsequent stanzas (Strofa 2, Strofa 3, etc.) if they lack chords
+  const processedSections = sections.map(sec => {
+    const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length > 1 && /^\[Strofa\s*[2-9]\]/i.test(lines[0])) {
+      const header = lines[0];
+      const stanzaLines = lines.slice(1);
+      const totalChordsInSec = (sec.match(/\[[A-H][b#]?[^\]]*\]/g) || []).length;
+      
+      // If stanza has fewer than half the expected chords from Stanza 1
+      if (totalChordsInSec < stanza1Matrix.flat().length * 0.5) {
+        const chordedLines = stanzaLines.map((line, idx) => {
+          if ((line.match(/\[[A-H][b#]?[^\]]*\]/g) || []).length >= 2) return line;
+          
+          const targetChords = stanza1Matrix[idx % stanza1Matrix.length] || [];
+          if (targetChords.length === 0) return line;
+
+          let cleanText = line.replace(/\[[^\]]+\]/g, '').trim();
+          if (!cleanText) return line;
+
+          let res = '';
+          const words = cleanText.split(/\s+/);
+          if (targetChords.length === 1) {
+            res = `[${targetChords[0].chord}]${cleanText}`;
+          } else {
+            const step = Math.max(1, Math.floor(words.length / targetChords.length));
+            const wordsWithChords = words.map((w, wIdx) => {
+              const chordIdx = Math.floor(wIdx / step);
+              if (wIdx % step === 0 && targetChords[chordIdx]) {
+                return `[${targetChords[chordIdx].chord}]${w}`;
+              }
+              return w;
+            });
+            res = wordsWithChords.join(' ');
+          }
+          return snapChordsToSyllables(res);
+        });
+
+        return [header, ...chordedLines].join('\n');
+      }
+    }
+    return sec;
+  });
+
+  return processedSections.join('\n\n');
+}
+
 export function formatSentencePunctuation(content) {
   if (!content) return '';
   const lines = content.split('\n');
@@ -317,12 +427,36 @@ export function correctGrammarAndSpelling(text) {
   // 1. Verb Negations (Odvojeno pisanje negacije uz glagole)
   const NEGATION_MAP = [
     [/\bneznam\b/gi, 'ne znam'],
+    // Adjective and Adverb Negations (MUST ALWAYS BE TOGETHER in Bosnian grammar)
+    [/\bne\s*mogu[cć]e\b/gi, 'nemoguće'],
+    [/\bne\s*mogu[cć]a\b/gi, 'nemoguća'],
+    [/\bne\s*mogu[cć]\b/gi, 'nemoguć'],
+    [/\bne\s*mogu[cć]i\b/gi, 'nemogući'],
+    [/\bne\s*mogu[cć]ih\b/gi, 'nemogućih'],
+    [/\bne\s*mogu[cć]eg\b/gi, 'nemogućeg'],
+    [/\bne\s*mogu[cć]nost\b/gi, 'nemogućnost'],
+    [/\bne\s*poznat/gi, 'nepoznat'],
+    [/\bne\s*sre[cć]/gi, 'nesreć'],
+    [/\bne\s*vjerna\b/gi, 'nevjerna'],
+    [/\bne\s*verna\b/gi, 'neverna'],
+    [/\bne\s*vjeran\b/gi, 'nevjeran'],
+    [/\bne\s*veran\b/gi, 'neveran'],
+    [/\bne\s*pravda\b/gi, 'nepravda'],
+    [/\bne\s*zaborav/gi, 'nezaborav'],
+    [/\bne\s*odoljiv/gi, 'neodoljiv'],
+    [/\bne\s*sigur/gi, 'nesigur'],
+    [/\bne\s*povrat/gi, 'nepovrat'],
+    [/\bne\s*prolaz/gi, 'neprolaz'],
+    [/\bne\s*vidljiv/gi, 'nevidljiv'],
+    [/\bne\s*mirn/gi, 'nemirn'],
+
+    // Verb Negations (MUST BE SEPARATE, except neću, nemam, nemoj, nisam)
     [/\bneznas\b/gi, 'ne znaš'],
     [/\bnezna\b/gi, 'ne zna'],
     [/\bneznamo\b/gi, 'ne znamo'],
     [/\bneznate\b/gi, 'ne znate'],
     [/\bneznaju\b/gi, 'ne znaju'],
-    [/\bnemogu\b/gi, 'ne mogu'],
+    [/\bnemogu\b(?!\s*[cć])/gi, 'ne mogu'],
     [/\bnemozes\b/gi, 'ne možeš'],
     [/\bnemoze\b/gi, 'ne može'],
     [/\bnemozemo\b/gi, 'ne možemo'],
@@ -1474,11 +1608,13 @@ export function applyQualityGate(rawContent, key = '') {
   output = cleanSyllableHyphenation(output);
   // 4. FRONT GATE GRAMMAR & SPELL CHECK
   output = correctGrammarAndSpelling(output);
-  // 5. Fix any double or nested brackets
-  output = output.replace(/\[\[+([A-H][b#]?[^\]]*)\]\]+/g, '[$1]');
-  // 6. Sentence punctuation formatting
+  // 5. Fix any double, nested or overlapping chords
+  output = healOverlappingAndBrokenChords(output);
+  // 6. Layer 9: Enforce Harmonic Stanza Symmetry & Full Chording across all verses
+  output = enforceHarmonicStanzaSymmetry(output);
+  // 7. Sentence punctuation formatting
   output = formatSentencePunctuation(output);
-  // 7. Re-index verse stanzas sequentially ([Strofa 1], [Strofa 2]...)
+  // 8. Re-index verse stanzas sequentially ([Strofa 1], [Strofa 2]...)
   output = reindexStanzas(output);
   return output;
 }

@@ -1,0 +1,65 @@
+import 'dotenv/config';
+import { MongoClient } from 'mongodb';
+import { EJSON } from 'bson';
+import { gunzipSync } from 'node:zlib';
+import fs from 'node:fs';
+
+const URI = process.env.MONGODB_URI;
+const target = 'octava';
+const file = 'backups/octava_2026-08-30T22-22-07.ejson.gz';
+
+console.log('======================================================================');
+console.log('🔄 OCTAVA FULL REVERT — VRAĆANJE BAZE NA ORIGINALNO STANJE PRE IZMENA');
+console.log('======================================================================\n');
+console.log('📦 Čitam originalni backup:', file);
+
+const payload = fs.readFileSync(file);
+const dump = EJSON.parse(gunzipSync(payload).toString());
+
+const client = new MongoClient(URI, { maxPoolSize: 10, connectTimeoutMS: 60000 });
+await client.connect();
+const db = client.db(target);
+
+console.log('🌐 Povezan na Atlas. Vraćam bazu na stanje:', dump.meta.takenAt, '\n');
+
+const collections = [
+  'artists',
+  'songs',
+  'genres',
+  'ratings',
+  'reviews',
+  'staff',
+  'users',
+  'notifications',
+  'chatmessages',
+  'auditlogs'
+];
+
+for (const name of collections) {
+  const docs = dump.data[name] || [];
+  console.log(`⏳ Obnavljam kolekciju "${name}" (${docs.length} dokumenata)...`);
+  
+  await db.collection(name).drop().catch(() => {});
+  
+  if (docs.length > 0) {
+    const batchSize = name === 'artists' ? 50 : 250;
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const chunk = docs.slice(i, i + batchSize);
+      try {
+        await db.collection(name).insertMany(chunk, { ordered: false });
+      } catch (err) {
+        // Ignore duplicate key errors
+      }
+      process.stdout.write(`\r   [${name}] Ubaceno ${Math.min(i + batchSize, docs.length)} / ${docs.length}...`);
+    }
+    console.log();
+  }
+  
+  const count = await db.collection(name).countDocuments();
+  console.log(`   ✅ "${name}" uspešno vraćena: ${count}/${docs.length} dokumenata.\n`);
+}
+
+await client.close();
+console.log('======================================================================');
+console.log('🎉 KOMPLETAN REVERT USPEŠNO ZAVRŠEN!');
+console.log('======================================================================\n');

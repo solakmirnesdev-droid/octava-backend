@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
 import '../src/models/Artist.js';
@@ -10,75 +10,97 @@ import {
   applyQualityGate,
   countChordsInContent,
   isDummyContent,
-  isTabLine
+  healOverlappingAndBrokenChords,
+  restoreExYuDiacritics,
+  correctGrammarAndSpelling,
+  detectOriginalKey,
+  estimateDifficulty
 } from './song_quality_gate.js';
+import { toLatin } from '../src/utils/latinise.js';
 
-const SLEEP_MS = 2000;
+const SLEEP_MS = 4000;
 
 async function runAnomalySweep() {
   const songs = await Song.find({ deletedAt: null }).populate('artist', 'name');
   let titleHealed = 0;
   let contentHealed = 0;
   let publishedAuto = 0;
+  let overlapHealed = 0;
+  let homoglyphsFixed = 0;
+  let ghostSectionsPurged = 0;
 
   for (const song of songs) {
     const artistName = song.artist?.name || '';
     const oldTitle = song.title || '';
 
-    // 1. Clean Title Anomalies
+    // 1. Radar for Title Anomalies & Inverted Artist - Title
     let cleanT = cleanOfficialTitle(oldTitle, artistName);
-    // Strip trailing years e.g. "Izbegavam 2011" -> "Izbegavam", "Putnicka 2011" -> "Putnička"
+    cleanT = restoreExYuDiacritics(cleanT);
     cleanT = cleanT.replace(/\s+(?:19[5-9]\d|20[0-2]\d)\b/g, '').trim();
-    // Strip trailing extensions .tab, .crd
     cleanT = cleanT.replace(/\.(?:tab|crd|txt|chords)\b/gi, '').trim();
-    // Strip double punctuation
     cleanT = cleanT.replace(/[\?\.]{2,}$/, '?').replace(/[\!\.]{2,}$/, '!').replace(/[\,\:\-]+$/, '').trim();
 
     if (cleanT && cleanT !== oldTitle) {
-      if (song.artist?._id) {
-        const existing = await Song.findOne({
-          artist: song.artist._id,
-          title: cleanT,
-          deletedAt: null,
-          _id: { $ne: song._id }
-        });
-        if (existing) {
-          const thisChords = countChordsInContent(song.arrangements?.[0]?.content || '');
-          const existingChords = countChordsInContent(existing.arrangements?.[0]?.content || '');
-          if (thisChords > existingChords) {
-            existing.deletedAt = new Date();
-            await existing.save();
-            song.title = cleanT;
-            await song.save();
-          } else {
-            song.deletedAt = new Date();
-            await song.save();
-          }
-          titleHealed++;
-          continue;
-        }
-      }
       try {
         song.title = cleanT;
         await song.save();
         titleHealed++;
       } catch (err) {
-        // Duplicate slug gracefully handled
+        // Handled duplicate slug
       }
     }
 
-    // 2. Clean Content & Harmonic Anomalies
-    const content = song.arrangements?.[0]?.content || '';
+    // 2. Radar for Chord Overlaps, Geometry & Homoglyphs
+    const arr = song.arrangements?.[0];
+    let content = arr?.content || '';
+
     if (content.length > 0 && !isDummyContent(content)) {
-      const healedContent = applyQualityGate(content, song.arrangements[0].originalKey || '');
-      if (healedContent !== content) {
-        song.arrangements[0].content = healedContent;
+      const oldLen = content.length;
+      
+      // Homoglyph & Cyrillic Hunter in Latin text
+      if (/[а-яА-ЯёЁ]/.test(content)) {
+        content = toLatin(content);
+        homoglyphsFixed++;
+      }
+
+      // Anti-Overlap Radar
+      const beforeOverlap = content;
+      content = healOverlappingAndBrokenChords(content);
+      if (content !== beforeOverlap) {
+        overlapHealed++;
+      }
+
+      // Ghost Section Purger
+      const lines = content.split('\n');
+      const filteredLines = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (/^\[(Strofa|Refren|Intro|Uvod|Solo|Outro|Prelaz)[\s0-9\/\:]*\]:?$/i.test(line)) {
+          const next = (lines[i + 1] || '').trim();
+          if (!next || /^\[(Strofa|Refren|Intro|Uvod|Solo|Outro|Prelaz)[\s0-9\/\:]*\]:?$/i.test(next)) {
+            ghostSectionsPurged++;
+            continue; // Purge ghost header
+          }
+        }
+        filteredLines.push(lines[i]);
+      }
+      content = filteredLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+      // Deep Quality Gate pass
+      const healedContent = applyQualityGate(content, arr?.originalKey || '');
+      
+      if (healedContent !== arr?.content) {
+        arr.content = healedContent;
+        if (!arr.originalKey) {
+          arr.originalKey = detectOriginalKey(healedContent);
+        }
+        arr.difficulty = estimateDifficulty(healedContent);
         await song.save();
         contentHealed++;
       }
 
-      // Auto-publish valid songs with real chords
-      if (song.status !== 'published' && countChordsInContent(healedContent) >= 4 && healedContent.split('\n').length >= 4) {
+      // Auto-publish verified songs with full lyrics & real chords
+      if (song.status !== 'published' && countChordsInContent(healedContent) >= 4 && healedContent.split('\n').length >= 6) {
         song.status = 'published';
         await song.save();
         publishedAuto++;
@@ -86,22 +108,22 @@ async function runAnomalySweep() {
     }
   }
 
-  if (titleHealed > 0 || contentHealed > 0 || publishedAuto > 0) {
-    console.log(`[AnomalyHealer] Cycle Summary: Titles Healed: ${titleHealed} | Lyrics Healed: ${contentHealed} | Auto-Published: ${publishedAuto}`);
+  if (titleHealed > 0 || contentHealed > 0 || publishedAuto > 0 || overlapHealed > 0 || homoglyphsFixed > 0) {
+    console.log(`🔍 [AnomalyHunter-2.0] Cycle: Titles: ${titleHealed} | Lyrics: ${contentHealed} | Overlaps: ${overlapHealed} | Homoglyphs: ${homoglyphsFixed} | Auto-Pub: ${publishedAuto}`);
   }
 }
 
 async function startDaemon() {
   console.log('======================================================================');
-  console.log('🔍 [AnomalyHealer] Autonomous Self-Improving Error Hunter Online');
+  console.log('💎 [AnomalyHunter-2.0] Multi-Radar Autonomous Precision Engine Online');
   console.log('======================================================================\n');
-  await mongoose.connect(process.env.MONGODB_URI);
+  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/octava');
 
   while (true) {
     try {
       await runAnomalySweep();
     } catch (err) {
-      console.error('[AnomalyHealer Error]', err.message);
+      console.error('[AnomalyHunter Error]', err.message);
     }
     await new Promise(r => setTimeout(r, SLEEP_MS));
   }

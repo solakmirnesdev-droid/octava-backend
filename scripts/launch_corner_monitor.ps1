@@ -1,0 +1,1 @@
+﻿Start-Process powershell -ArgumentList "-NoExit", "-Command", "$Host.UI.RawUI.WindowTitle = '💎 OCTAVA REAL-TIME CORNER LIVE MONITOR (ATLAS CLOUD)'; cd 'c:\dev\octava\octava-backend'; node scripts/corner_live_monitor.js" -WorkingDirectory "c:\dev\octava\octava-backend"

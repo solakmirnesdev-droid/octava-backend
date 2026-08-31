@@ -51,10 +51,13 @@ export async function fetchFullLyricsOnline(artistName, songTitle) {
           let lyrics = '';
 
           if (targetUrl.includes('tekstovi.net')) {
-            const m = pageHtml.match(/<p class="lyric">([\s\S]*?)<\/p>/i);
+            const m = pageHtml.match(/<section[^>]*class=["']lyrics["'][^>]*>([\s\S]*?)<\/section>/i) ||
+                      pageHtml.match(/<p class="lyric">([\s\S]*?)<\/p>/i) ||
+                      pageHtml.match(/<div class="lyrics">([\s\S]*?)<\/div>/i);
             if (m) lyrics = m[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
           } else if (targetUrl.includes('tekstomanija.com')) {
-            const m = pageHtml.match(/<div class="tekst-pesme">([\s\S]*?)<\/div>/i) || pageHtml.match(/<div class="entry-content">([\s\S]*?)<\/div>/i);
+            const m = pageHtml.match(/<div class="tekst-pesme">([\s\S]*?)<\/div>/i) || 
+                      pageHtml.match(/<div class="entry-content">([\s\S]*?)<\/div>/i);
             if (m) lyrics = m[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
           }
 

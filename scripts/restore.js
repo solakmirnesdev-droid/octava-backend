@@ -72,7 +72,12 @@ try {
   let restored = 0;
   for (const [name, docs] of Object.entries(dump.data)) {
     await db.collection(name).deleteMany({});
-    if (docs.length) await db.collection(name).insertMany(docs);
+    if (docs.length) {
+      const CHUNK = 500;
+      for (let i = 0; i < docs.length; i += CHUNK) {
+        await db.collection(name).insertMany(docs.slice(i, i + CHUNK), { ordered: false });
+      }
+    }
 
     const actual = await db.collection(name).countDocuments();
     const expected = dump.meta.collections[name];
