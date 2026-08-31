@@ -28,7 +28,7 @@ const SERVICES = [
   { name: 'Year-Genre-Enricher', script: 'scripts/healers/year_and_genre_enricher.js' },
   { name: 'Smart-Mood-Tagger', script: 'scripts/healers/smart_mood_and_playlist_tagger.js' },
   { name: 'Deep-Forensic-Lyrics', script: 'scripts/healers/lyrics_completer.js' },
-  { name: 'Key-Detector-Healer', script: 'scripts/healers/key_detector_healer.js' },
+  { name: 'Key-Detector-Healer', script: 'scripts/healers/key_detector_healer.js', args: ['--daemon', '--write'] },
   { name: 'Ghost-Section-Purger', script: 'scripts/healers/ghost_section_purger.js' },
   { name: 'RealTime-Watcher', script: 'scripts/daemons/realtime_gate_watcher.js' },
   { name: 'Portrait-Enricher', script: 'scripts/healers/artist_portrait_enricher.js' },
@@ -43,7 +43,7 @@ function runService(service) {
   const logFile = path.join(logsDir, `${service.name.toLowerCase()}.log`);
   const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
-  const child = spawn('node', [service.script], {
+  const child = spawn('node', [service.script, ...(service.args || [])], {
     cwd: rootDir,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: process.env

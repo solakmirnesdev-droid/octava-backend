@@ -16,6 +16,7 @@ import {
   estimateDifficulty,
   healOverlappingAndBrokenChords
 } from '../healers/song_quality_gate.js';
+import { dionice } from './dionica.js';
 
 const SLEEP_MS = 3000;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -36,9 +37,23 @@ export async function runQuadrantWorker(config) {
   while (true) {
     const startTime = Date.now();
     try {
-      const totalCount = await Song.countDocuments({ deletedAt: null });
-      const quadSize = Math.ceil(totalCount / totalQuadrants);
-      const startOffset = quadrantIndex * quadSize;
+      /*
+       * AI-TRAP: partition in ONE fixed order, then traverse in whichever
+       * direction this worker wants. The original computed
+       * skip = quadrantIndex * quadSize while ALSO flipping the sort per
+       * quadrant, so the offset counted from the far end for the 'desc'
+       * workers. Measured on 14,389 songs it put Q1 and Q4 both on positions
+       * 1-3598, Q2 and Q3 both on 7194-10794, and left 7,190 songs — half the
+       * catalogue — untouched every single night while the other half was
+       * healed twice by two daemons racing each other.
+       *
+       * dionice() cuts at measured quantiles and is verified disjoint: four
+       * lanes of 3597/3597/3597/3598, sum exactly the catalogue, zero overlap.
+       */
+      const [mojOpseg] = [(await dionice(Song, { deletedAt: null }, totalQuadrants))[quadrantIndex]];
+      const totalCount = await Song.countDocuments(mojOpseg);
+      const quadSize = totalCount;
+      const startOffset = 0;
       const sortOrder = direction === 'desc' ? { _id: -1 } : { _id: 1 };
 
       let totalProcessed = 0;
@@ -47,7 +62,7 @@ export async function runQuadrantWorker(config) {
 
       for (let offset = 0; offset < quadSize; offset += BATCH_SIZE) {
         const currentLimit = Math.min(BATCH_SIZE, quadSize - offset);
-        const batch = await Song.find({ deletedAt: null })
+        const batch = await Song.find(mojOpseg)
           .select('_id title arrangements.content arrangements.originalKey arrangements.difficulty artist')
           .sort(sortOrder)
           .skip(startOffset + offset)

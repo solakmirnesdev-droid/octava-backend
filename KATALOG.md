@@ -200,7 +200,25 @@ Pre-save hook računa `searchName` samo pri `save()`. Preimenovanja kroz
 slijepo:** `Dušk'o Kuliš` ima `"dusko kulis"`, a slugify daje `"dusk o kulis"` —
 apostrof cijepa riječ i to je **gore**. Preskoči imena s apostrofom.
 
-### 5.16 `npm run katalog popravi` ne prosljeđuje riječ
+### 5.16 Noćni kvadranti su pokrivali pola kataloga dvaput, a pola nikad
+`quadrant_runner.js` je računao `skip = quadrantIndex * quadSize` **i istovremeno
+obrtao sort po kvadrantu**. Kad skip broji od suprotnog kraja, Q1 i Q4 završe na
+istim pjesmama, a Q2 i Q3 na istim. Izmjereno na 14.389 pjesama:
+
+| kvadrant | pokrivao pozicije |
+|---|---|
+| Q1 (asc) | 1 – 3.598 |
+| Q4 (desc) | 1 – 3.595 |
+| Q2 (desc) | 7.194 – 10.791 |
+| Q3 (asc) | 7.197 – 10.794 |
+
+**7.190 pjesama (50%) nikad nije obrađeno**, a 7.190 dvaput, s dva demona koji
+se sudaraju — svake noći. Popravljeno korištenjem `dionice()`: 3597 | 3597 |
+3597 | 3598, zbir tačan, nula preklapanja.
+
+**Pravilo: dijeli u JEDNOM fiksnom poretku, pa obilazi kojim smjerom hoćeš.**
+
+### 5.17 `npm run katalog popravi` ne prosljeđuje riječ
 npm traži `--` prije argumenata. Direktni oblik radi:
 `node scripts/katalog.js popravi --write`.
 
@@ -271,6 +289,23 @@ uživo), ponekad pogrešno dodijeljen video. Ručno.
   bili su artefakt agregacije koja broji kantu (§5.12). Nema šta da se spaja.
 - **Duplikati izvođača: 0 živih.** Nakon popravke `searchName` nijedna grupa
   nije ostala.
+
+---
+
+## 7b. Noćni rad (desktop)
+
+```bash
+npm run master        # 16 demona, cijelu noć
+```
+
+Dvije stvari su popravljene 2026-08-31 i moraju ostati takve:
+
+1. **Kvadranti** — vidi §5.16. Prije popravke pola kataloga se nije diralo.
+2. **`key_detector_healer.js`** traži `--daemon --write`; master mu ih sada
+   prosljeđuje kroz `args`. Bez toga odradi jedan prazan prolaz i izađe.
+
+**Baze:** `.env`/`.env.dev` gađaju lokalni Mongo, `.env.prod` gađa Atlas. Nisu
+iste i razišle su se. Provjeri u koju pišeš prije `--write`.
 
 ---
 
