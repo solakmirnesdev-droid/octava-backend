@@ -15,7 +15,7 @@ import {
   detectOriginalKey,
   estimateDifficulty,
   healOverlappingAndBrokenChords
-} from '../song_quality_gate.js';
+} from '../healers/song_quality_gate.js';
 
 const SLEEP_MS = 3000;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));

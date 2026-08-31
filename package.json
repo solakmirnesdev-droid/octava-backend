@@ -7,11 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "master": "node scripts/start_overnight_master.js",
-    "healer": "node scripts/continuous_quality_healer.js",
+    "master": "node scripts/daemons/start_overnight_master.js",
+    "healer": "node scripts/daemons/continuous_quality_healer.js",
     "watch:healer": "tail -f logs/healer_live.log",
-    "backup": "node scripts/backup.js",
-    "restore": "node scripts/restore.js",
+    "backup": "node scripts/maintenance/backup.js",
+    "restore": "node scripts/maintenance/restore.js",
     "test": "node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js"
   },

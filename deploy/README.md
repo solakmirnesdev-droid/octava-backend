@@ -92,7 +92,7 @@ Nobody can sign in yet, and the screen that creates accounts needs somebody
 signed in to open it. That is what the bootstrap script is for:
 
 ```bash
-sudo -u octava node scripts/createAdmin.js
+sudo -u octava node scripts/maintenance/createAdmin.js
 ```
 
 Every account after that is made from the dashboard, where it is written to the
@@ -112,6 +112,6 @@ Sessions survive — they are tokens, not server state.
 ## What this does not cover
 
 A firewall (only 80 and 443 should be open), certificate issuance, log
-rotation beyond journald's defaults, and off-machine backups. `scripts/backup.js`
+rotation beyond journald's defaults, and off-machine backups. `scripts/maintenance/backup.js`
 writes locally and encrypts with `BACKUP_KEY`; getting that file somewhere else
 is still a manual job.

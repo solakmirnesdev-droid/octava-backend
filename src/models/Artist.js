@@ -240,6 +240,15 @@ artistSchema.methods.toCard = function toCard() {
  */
 // The live watcher asks for the newest row every few seconds; without this
 // that is a collection scan of the whole catalogue each time.
+/*
+ * The roster, alphabetically, which is how every screen reads it.
+ *
+ * Same reasoning as Song: the soft-delete hook puts `deletedAt` in front of
+ * every query, so it has to lead the index or the sort falls back to walking
+ * the collection - 2,813 documents examined to return 25.
+ */
+artistSchema.index({ deletedAt: 1, name: 1 });
+
 artistSchema.index({ updatedAt: -1 });
 
 for (const event of ['save', 'findOneAndUpdate', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany']) {

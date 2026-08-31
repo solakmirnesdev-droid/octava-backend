@@ -24,12 +24,12 @@ Server runs on `http://localhost:4000`.
 
 To start the autonomous 11-daemon supervisor:
 ```bash
-node scripts/start_overnight_master.js
+node scripts/daemons/start_overnight_master.js
 ```
 
 To monitor real-time progress and live metrics in terminal:
 ```bash
-node scripts/live_dashboard_monitor.js
+node scripts/daemons/live_dashboard_monitor.js
 ```
 
 ---

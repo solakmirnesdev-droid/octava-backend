@@ -72,6 +72,34 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-08-31 — Development writes locally; the cluster is production only
+
+- **What was wrong:** `.env.dev` held the Atlas URI and `.env` held the local
+  one, and `config/env.js` reads `.env.dev` first. So every `npm run dev`, every
+  script, and every test run went straight at the production cluster. A day of
+  catalogue rewrites — 594 sheets, the view counters, the healer — all landed
+  there because of two files being the wrong way round.
+- **Now:** `.env.dev` → local mongod · `.env.prod` → Atlas, `NODE_ENV=production`
+  · `.env` → local, as a harmless fallback. `.env.prod` did not exist before, so
+  a production start would have fallen through to `.env` and looked for a
+  database on localhost that is not there.
+- **Verified by counting, not by reading config:** the two databases differ
+  (11,995 published locally against 13,537 on Atlas), so the API's own total
+  says which one it is on. A song inserted straight into the local database is
+  now visible through the API.
+- **AI-TRAP, twice in one day:** a stale `node server.js` kept port 4000 while a
+  new nodemon crashed on EADDRINUSE, so the running server was reading the old
+  environment and every measurement pointed at the wrong database. The file
+  timestamp was three minutes *after* the process start, which is what gave it
+  away. When behaviour disagrees with configuration, check
+  `ps -o lstart= -p $(lsof -nP -iTCP:4000 -sTCP:LISTEN -t)` before the code.
+- **Backups:** 113 encrypted archives on Google Drive, newest hourly. Two gaps
+  worth knowing — `npm run backup` points at `scripts/backup.js` which has moved
+  to `scripts/maintenance/`, and one archive
+  (`octava-latest-direct-ready.ejson.gz`) is not encrypted, so it carries the
+  catalogue and the TOTP secrets in the clear.
+- **Files:** `.env.dev`, `.env.prod` (neither in git).
+
 ### 2026-08-30 — The dashboard updates itself, including for writes it cannot see
 
 - **What it does:** the API announces `data:changed` over the chat's existing
@@ -147,7 +175,7 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
   shell, so an nvm-managed node is not on its PATH, and the failure it produces
   (`203/EXEC`) says nothing about why.
 - **`ReadWritePaths=/srv/octava/backups`** is required by `ProtectSystem=strict`
-  or `scripts/backup.js` fails with EROFS, which reads as a disk fault.
+  or `scripts/maintenance/backup.js` fails with EROFS, which reads as a disk fault.
 - **Two real gaps found while writing it:**
   - nginx had no port 80 listener at all, so a bare domain answered "connection
     refused" and certbot had nowhere to serve its challenge. Added, with
@@ -215,7 +243,7 @@ Two things were fixed as a result:
   what was behind it — which was nothing. `worthLocking()` decides this.
 - **Catalogue after:** 1569 published — 833 with real chords, 594 waiting for a
   transcription, 142 with none.
-- **Files:** `scripts/clear-demo-lyrics.js`, `controllers/songController.js`,
+- **Files:** `scripts/fixes/clear-demo-lyrics.js`, `controllers/songController.js`,
   `test/subscription.test.js`.
 
 ### 2026-08-30 — The wall asks for an account, not a payment (for now)
@@ -292,7 +320,7 @@ Two things were fixed as a result:
   (the whole `accounts` router is), Zod-validated, audit-logged as
   `create/staff`, and it answers with the exact shape `listStaff` returns so the
   dashboard can take the row as it is.
-- **Why:** creation had no API at all — `scripts/createAdmin.js` was the only
+- **Why:** creation had no API at all — `scripts/maintenance/createAdmin.js` was the only
   path, and it needs a shell on the server. That made handing somebody a login
   an operations task, and it left no audit trail of who was given what.
 - **Password minimum is 12 here, not the 8 used everywhere else.** Deliberate,
@@ -309,7 +337,7 @@ Two things were fixed as a result:
   above it. Comment moderation already sits at `admin`, so a moderator is an
   admin. Revisit only if moderation must be split from deletion.
 - **Files:** `controllers/accountController.js`, `routes/accounts.js`,
-  `middleware/schemas.js`, `scripts/createAdmin.js` (marked bootstrap-only),
+  `middleware/schemas.js`, `scripts/maintenance/createAdmin.js` (marked bootstrap-only),
   `test/staffCreate.test.js`.
 
 ### 2026-08-29 — A path for authored songs, and the gate that stands in front of it

@@ -31,6 +31,72 @@ async function visibleCounts(ids, staff) {
   return new Map(rows.map((r) => [String(r._id), r.n]));
 }
 
+/**
+ * The counts a roster screen needs, without downloading the roster.
+ *
+ * AI-DECISION: one aggregate instead of the dashboard paging through every
+ * artist to tally them in the browser. That cost 29 requests and 1.1MB on a
+ * catalogue of 2,813, and the browser threw all of it away except three
+ * numbers and a list of countries.
+ *
+ * AI-TRAP: "no country" and "no picture" each have three shapes in this data —
+ * absent, null and empty string — because the fields were added at different
+ * times and written by different importers. Counting only the absent ones
+ * under-reports the pile somebody is trying to work through.
+ */
+export async function facets(_req, res, next) {
+  try {
+    /*
+     * AI-TRAP: destructure the aggregate's FIRST DOCUMENT, not the first
+     * promise. `const [rows] = await Promise.all([...])` binds the result
+     * array, which is truthy, so the `||` fallback never fires and every count
+     * reads as undefined — and JSON.stringify drops undefined keys silently.
+     * The endpoint answered 200 with the countries present and the totals
+     * simply absent.
+     */
+    const [totals = { total: 0, withoutCountry: 0, withoutImage: 0 }] = await Artist.aggregate([
+        { $match: { deletedAt: null } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            withoutCountry: {
+              $sum: { $cond: [{ $in: [{ $ifNull: ['$country', ''] }, ['', null]] }, 1, 0] }
+            },
+            withoutImage: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: [{ $ifNull: ['$imageBytes', 0] }, 0] },
+                      { $in: [{ $ifNull: ['$imageUrl', ''] }, ['', null]] }
+                    ]
+                  },
+                  1, 0
+                ]
+              }
+            }
+          }
+        }
+    ]);
+
+    const countries = await Artist.aggregate([
+      { $match: { deletedAt: null, country: { $nin: [null, ''] } } },
+      { $group: { _id: '$country', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.json({
+      total: totals.total,
+      withoutCountry: totals.withoutCountry,
+      withoutImage: totals.withoutImage,
+      countries: countries.map((c) => ({ code: c._id, count: c.count }))
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function list(req, res, next) {
   try {
     const paging = readPaging(req.query);

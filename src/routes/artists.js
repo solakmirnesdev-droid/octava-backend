@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
-import { list, getOne, letterIndex } from '../controllers/artistController.js';
+import { list, getOne, letterIndex, facets
+} from '../controllers/artistController.js';
 import { optionalAuth, requireStaff, requireRole } from '../middleware/auth.js';
 import {
   create, update, remove, uploadImage, deleteImage, serveImage, MAX_IMAGE_BYTES,
@@ -9,6 +10,9 @@ import { validate } from '../middleware/validate.js';
 import { artistListQuery, slugParam } from '../middleware/schemas.js';
 
 const router = Router();
+
+// Before the /:slug handler, like /trash, or 'facets' is read as a slug.
+router.get('/facets', facets);
 
 router.get('/', validate({ query: artistListQuery }), list);
 

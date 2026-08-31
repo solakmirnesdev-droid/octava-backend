@@ -149,7 +149,7 @@ description: >-
 34. **Full Lyrics Completer & Zero-`x2` Pure Repetition Policy**:
     - **Puni tekst bez skraćenica:** Tekst svake pjesme mora biti 100% kompletan sa svim strofama i refrenima.
     - **Strogo zabranjeno `(2x)`, `x2`, `2x`:** Sve oznake ponavljanja na nivou stiha (`[Am]Stih (2x)` $\rightarrow$ duplira stih u 2 puna reda) ili strofe (`[Refren (2x)]` $\rightarrow$ duplira čitav refren sa svim akordima) se odmotavaju u stvarne stihove.
-    - **Upoređivanje i harmonizacija:** Skener i `scripts/lyrics_completer.js` upoređuju pjesme sa studijskim bazama (Genius, Tekstomanija, Tekstovi.net) i automatski projektuju harmonijsku progresiju na sve nedostajuće strofe.
+    - **Upoređivanje i harmonizacija:** Skener i `scripts/healers/lyrics_completer.js` upoređuju pjesme sa studijskim bazama (Genius, Tekstomanija, Tekstovi.net) i automatski projektuju harmonijsku progresiju na sve nedostajuće strofe.
 
 35. **Ghost Bracket & Stray URL Annihilator Policy**:
     - Automatski briše prazne uglaste zagrade `[]`, sanira višestruke uglaste zagrade `[[Am]]` $\rightarrow$ `[Am]`, i uklanja sve zalutale linkove (`http://`, `https://`, `www.pesmarica.rs`, `2akordi.net`), domene i email adrese ostavljene unutar stihova.
@@ -175,7 +175,7 @@ description: >-
       - `MK` 🇲🇰: Severna Makedonija (Toše Proeski, Vlatko Stefanovski, Leb i Sol, Kaliopi, Tijana Dapčević, Esma Redžepova...)
       - `SI` 🇸🇮: Slovenija (Vlado Kreslin, Magnifico, Siddharta, Laibach, Zoran Predin, Lačni Franz, Joker Out...)
       - `SE` 🇸🇪: Švedska (Ace of Base, ABBA, Roxette...)
-    - Country Engine automatski prepoznaje državu iz baze znanja, porijekla grada ili Wikipedia extract API-ja (`scripts/detect_artist_country.js` & `scripts/artist_country_enricher.js`).
+    - Country Engine automatski prepoznaje državu iz baze znanja, porijekla grada ili Wikipedia extract API-ja (`scripts/healers/detect_artist_country.js` & `scripts/healers/artist_country_enricher.js`).
 
 40. **Strict Canonical Artist Matching & Annotation Scrubber (`Anti-Parentheses / Anti-Duplicate Policy`)**:
     - Strogo zabranjene forumaške zagrade i anotacije u imenima izvođača:
@@ -204,14 +204,14 @@ description: >-
     - Automatski ispravlja tipfelere u naslovima (`Bstra voda` $\rightarrow$ `Bistra voda`).
 
 43. **Autonomous YouTube Studio Audio/Video Matcher**:
-    - `scripts/youtube_matcher_daemon.js` automatski pretražuje i povezuje zvanične studio audio/video snimke (`youtubeId`) za svaku pjesmu u bazi, omogućavajući reprodukciju originalne numere u uglu ekrana tokom sviranja.
+    - `scripts/daemons/youtube_matcher_daemon.js` automatski pretražuje i povezuje zvanične studio audio/video snimke (`youtubeId`) za svaku pjesmu u bazi, omogućavajući reprodukciju originalne numere u uglu ekrana tokom sviranja.
 
 44. **Smart Phonetic & Fuzzy Search with Diacritic/Compound Word Folding**:
     - Algoritam u `src/utils/fuzzy.js` podržava kucanje bez kvačica (`saban saulic` $\rightarrow$ `Šaban Šaulić`), spojene riječi (`bjelodugme` $\rightarrow$ `Bijelo Dugme`, `ribljacorba` $\rightarrow$ `Riblja Čorba`) i tipfelere (`dino merln` $\rightarrow$ `Dino Merlin`).
 
 45. **Overnight Master Supervisor & Automated Rolling Backup Daemon**:
-    - `scripts/start_overnight_master.js` paralelno nadgleda 9 specijalizovanih servisa sa 3-sekundnim auto-restartom pri grešci.
-    - `scripts/auto_backup_daemon.js` automatski kreira kompletan JSON snapshot baze svaka 2 sata u `backups/`.
+    - `scripts/daemons/start_overnight_master.js` paralelno nadgleda 9 specijalizovanih servisa sa 3-sekundnim auto-restartom pri grešci.
+    - `scripts/daemons/auto_backup_daemon.js` automatski kreira kompletan JSON snapshot baze svaka 2 sata u `backups/`.
 
 46. **Inverted Song-Artist Auto-Rectification Policy (`Anti-Inversion Policy`)**:
     - Ako forumaški unos zamijeni mjesta izvođaču i pjesmi (npr. naslov pjesme je `S. isović (ii verzija)`, a izvođač `Zvijezda Tjera Mjeseca`):
@@ -236,25 +236,25 @@ description: >-
       - Imena i nazivi: `Al'Dino`, `Čija si, nisi`, `Bez časti`.
 
 50. **Continuous Autonomous Anomaly Hunter & Quality Gate Sync (`Self-Improving Healer Daemon`)**:
-    - `scripts/anomaly_discovery_healer.js` kontinuirano i periodično skenira bazu u potrazi za novim forumaškim anomalijama:
+    - `scripts/healers/anomaly_discovery_healer.js` kontinuirano i periodično skenira bazu u potrazi za novim forumaškim anomalijama:
       - Uklanja zalutale godine (`2011`, `1984`), ekstenzije (`.tab`, `.crd`, `.txt`) i duplu interpunkciju (`???`, `...`).
       - Automatski prepoznaje i popravlja nepotpune akorde i prazne sekcije bez stihova.
-      - Sve nove uočene greške se automatski kodiraju u `scripts/song_quality_gate.js` i dokumentuju u `SKILL.md`.
+      - Sve nove uočene greške se automatski kodiraju u `scripts/healers/song_quality_gate.js` i dokumentuju u `SKILL.md`.
 
 51. **Harmonic Tonality & Key Detection Standard (`Harmonic Tonality Policy`)**:
-    - `scripts/key_detector_healer.js` analizira distribuciju akorada, kadence (I-IV-V stepeni), toniku i prve/posljednje akorde.
+    - `scripts/healers/key_detector_healer.js` analizira distribuciju akorada, kadence (I-IV-V stepeni), toniku i prve/posljednje akorde.
     - Automatski i matematički tačno dodjeljuje pravi tonalitet (`originalKey`) i težinu sviranja (`easy`, `medium`, `hard` na bazi barre hvatova) za svaku numeru.
 
 52. **Real-Time Zero-Latency Quality Gate Watcher (`RealTime Watcher Standard`)**:
-    - `scripts/realtime_gate_watcher.js` se kači na MongoDB ChangeStreams / reaktivni event loop.
+    - `scripts/daemons/realtime_gate_watcher.js` se kači na MongoDB ChangeStreams / reaktivni event loop.
     - Čim se pjesma kreira ili izmijeni na Dashboardu, Quality Gate je polira u roku od <10ms prije nego što je bilo koji korisnik otvori.
 
 53. **Ghost Section & Broken Bracket Squeezer (`Ghost Header Purge Standard`)**:
-    - `scripts/ghost_section_purger.js` eliminiše prazne sekcije bez stihova (`[Solo]`, `[Outro]`), spaja uzastopna dupla zaglavlja (`[Refren]\n[Refren]`), popravlja polomljene zagrade (`[[Am]`) i renumeriše strofe u strogi sekvencijalni niz (`[Strofa 1]`, `[Strofa 2]`, `[Strofa 3]`).
+    - `scripts/healers/ghost_section_purger.js` eliminiše prazne sekcije bez stihova (`[Solo]`, `[Outro]`), spaja uzastopna dupla zaglavlja (`[Refren]\n[Refren]`), popravlja polomljene zagrade (`[[Am]`) i renumeriše strofe u strogi sekvencijalni niz (`[Strofa 1]`, `[Strofa 2]`, `[Strofa 3]`).
 
 54. **Strict Genuine Studio Portrait Standard (`Strict Portrait Policy`)**:
     - **Strogo je zabranjeno čuvanje nasumičnih slika, omota albuma, grbova, zastava, karata ili logotipa umjesto lica izvođača.**
-    - `scripts/artist_portrait_enricher.js` koristi striktan filter sa crnom listom (`coat_of_arms`, `grb`, `zastava`, `flag`, `map`, `logo`, `cover`, `album`, `cd`, `vinyl`, `stadium`).
+    - `scripts/healers/artist_portrait_enricher.js` koristi striktan filter sa crnom listom (`coat_of_arms`, `grb`, `zastava`, `flag`, `map`, `logo`, `cover`, `album`, `cd`, `vinyl`, `stadium`).
     - Koristi isključivo **verifikovane studio fotografije izvođača i članova benda** sa Deezer Artist API-ja, TheAudioDB API-ja, Wikidata P18 entiteta i biografskih slika sa Wikipedije.
     - Validira proporcije lica ($0.5 \le \text{ratio} \le 2.0$), automatski centrira kadar i kompresuje u WebP format $\le 20\text{ KB}$.
 
@@ -270,12 +270,12 @@ description: >-
 
 56. **Zero Text on WebP Images Policy (`Anti-Text & Pure Visual Standard`)**:
     - **Strogo je zabranjeno prisustvo bilo kakvog teksta, slova, inicijala, vodenih žigova ili tipografije na WebP slikama izvođača.**
-    - `generateStudioAvatar` u `scripts/artist_portrait_enricher.js` generiše isključivo čiste, elegantne, tamne apstraktne siluete i akustične talase bez `<text>` elemenata.
+    - `generateStudioAvatar` u `scripts/healers/artist_portrait_enricher.js` generiše isključivo čiste, elegantne, tamne apstraktne siluete i akustične talase bez `<text>` elemenata.
     - Svi postojeći avatari u bazi se automatski konvertuju u 100% beztekstualne vizuale.
 
 57. **Junk / Inverted / Non-Existent Artist Purge Policy (`Artist Sanitization Standard`)**:
     - **Strogo je zabranjeno čuvanje brojeva, nasumičnih stringova ili naziva pjesama kao imena izvođača** (npr. `123`, `Nepoznat`, `21 Vjek`, `Noćas Mi Srce Pati`, `Dušo Moja`).
-    - Skener i `scripts/heal_nonexistent_and_foreign_artists.js` automatski prepoznaju invertovane unose, preusmjeravaju pjesmu na stvarnog izvođača (`Miligram`, `Toma Zdravković`, `Kemal Monteno`), a lažni profil trajno brišu.
+    - Skener i `scripts/healers/heal_nonexistent_and_foreign_artists.js` automatski prepoznaju invertovane unose, preusmjeravaju pjesmu na stvarnog izvođača (`Miligram`, `Toma Zdravković`, `Kemal Monteno`), a lažni profil trajno brišu.
     - Svi prazni profili sa 0 pjesama se automatski uklanjaju.
     - Strani / zapadni izvođači dobijaju tačnu matičnu državu (`US`, `GB`, `SE`, `DE`, `IT`) i status `draft` kako ne bi zagađivali balkanski javni katalog.
 

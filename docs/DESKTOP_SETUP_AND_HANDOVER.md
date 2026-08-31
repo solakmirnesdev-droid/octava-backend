@@ -38,7 +38,7 @@ CORS_ORIGIN=http://localhost:3000,http://localhost:8000
 ### 4. Optional: Offline Local MongoDB Restore
 If running an offline local MongoDB instance instead of Atlas:
 ```bash
-node scripts/restore.js "path/to/octava-latest-direct-ready.ejson.gz" --into octava --force
+node scripts/maintenance/restore.js "path/to/octava-latest-direct-ready.ejson.gz" --into octava --force
 ```
 
 ---
@@ -54,7 +54,7 @@ The API server will listen on `http://localhost:4000`.
 ### 6. Launch the 11-Daemon Master Polish Supervisor
 In a new terminal window:
 ```bash
-node scripts/start_overnight_master.js
+node scripts/daemons/start_overnight_master.js
 ```
 This automatically starts all 11 daemons:
 * 🎸 Harmonic Healer (Akordi & kvačice)
@@ -72,7 +72,7 @@ This automatically starts all 11 daemons:
 ### 7. View Live Terminal Monitor
 In a third terminal window:
 ```bash
-node scripts/live_dashboard_monitor.js
+node scripts/daemons/live_dashboard_monitor.js
 ```
 
 ---
