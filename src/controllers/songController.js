@@ -13,7 +13,7 @@ import { detachSongs } from '../utils/songCleanup.js';
 import Notification from '../models/Notification.js';
 import { pushToStaff } from '../realtime/chat.js';
 import { mayReadPaid, paywallOn } from '../middleware/subscription.js';
-import { scoreMatch } from '../utils/fuzzy.js';
+import { scoreMatch, SCORE } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
 
 /**
@@ -204,6 +204,65 @@ export async function search(req, res, next) {
      * correct a query that was already right. A fallback that fires while the
      * fast path is succeeding is not a fallback.
      */
+    /*
+     * The lyric pass: what somebody types when they cannot remember the title.
+     *
+     * AI-DECISION: placed between the substring pass and the fuzzy one, and it
+     * changes the cost of the whole endpoint. The text index already covered
+     * `arrangements.content` — it was built and then never queried — so a
+     * remembered line was answered by scanning twelve thousand songs in memory
+     * and finding nothing, when an index could answer it in ten milliseconds.
+     *
+     * AI-NOTE: the raw query goes in, not the folded one. Mongo's text index
+     * does its own diacritic folding — measured: "noći moje" and "noci moje"
+     * return the same rows — and handing it slugified text would strip the very
+     * word boundaries it tokenises on.
+     *
+     * AI-TRAP: this also relieves the warning left above about the fuzzy pass
+     * outgrowing the catalogue, which came true — 11,994 published songs
+     * against the 1,570 that justified it. Most queries that reach the fallback
+     * are half-remembered lines, and those now stop here, on an index.
+     */
+    const viaLyrics = new Map();
+
+    if (!rows.length && !artistHits.length) {
+      /*
+       * Phrase first, loose second.
+       *
+       * AI-TRAP: Mongo's text search ORs the terms by default, and a
+       * half-remembered line is mostly short common words. Searching
+       * `bile su ti krive` unquoted returned "Ti, ti, ti" and "Su su" — songs
+       * that matched on `ti` and `su` and nothing else, which is worse than no
+       * result because it looks like an answer. Quoting makes it a phrase, and
+       * the loose pass stays behind it for the reader who has a word wrong.
+       */
+      const lyricQuery = async (search) => Song.find(
+        { ...visible, $text: { $search: search } },
+        { score: { $meta: 'textScore' }, searchTitle: 1, views: 1, artist: 1 }
+      )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(200)
+        .lean();
+
+      const phrase = q.includes('"') ? q : `"${q}"`;
+      let lyric = await lyricQuery(phrase);
+
+      // Only a multi-word query has a phrase to fall back from; a single word
+      // is already the loose search.
+      if (!lyric.length && q.trim().includes(' ')) lyric = await lyricQuery(q);
+
+      for (const row of lyric) {
+        // Scaled into the same range the title scores use, and kept below a
+        // real title match: remembering a line is weaker evidence than naming
+        // the song.
+        viaLyrics.set(String(row._id), Math.min(SCORE.CONTAINS, Math.round(row.score * 10)));
+      }
+      rows = lyric;
+    }
+
+    /*
+     * The fuzzy pass is the last resort, and only when nothing else answered.
+     */
     if (!rows.length && !artistHits.length) {
       corrected = true;
       artistHits = rank(await Artist.find().select(artistFields), (a) => a.searchName);
@@ -221,7 +280,11 @@ export async function search(req, res, next) {
         return {
           row,
           titleScore,
-          score: Math.max(titleScore, viaArtist.get(String(row.artist)) || 0)
+          score: Math.max(
+            titleScore,
+            viaArtist.get(String(row.artist)) || 0,
+            viaLyrics.get(String(row._id)) || 0
+          )
         };
       })
       .filter((x) => x.score > 0)

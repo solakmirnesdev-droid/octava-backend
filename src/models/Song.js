@@ -57,6 +57,21 @@ const songSchema = new mongoose.Schema(
      * matching diacritic-insensitive without a collation on every query.
      */
     searchTitle: { type: String, index: true },
+
+    /**
+     * The words of the song with the chords taken out, for the text index.
+     *
+     * AI-TRAP: the index used to point straight at `arrangements.content`, and
+     * that content is ChordPro — `[Am]Sinoć kad je pao mrak`. Single words
+     * still tokenised, so it looked like it worked, but a PHRASE broke at every
+     * chord sitting mid-line: searching a line copied verbatim out of a song
+     * returned that song zero times. Somebody who half-remembers a lyric types
+     * a phrase, which is exactly the case that failed.
+     *
+     * Written by the hook below rather than computed on read, because a text
+     * index can only be built over a stored field.
+     */
+    searchLyrics: { type: String, default: '' },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true, index: true },
 
     arrangements: {
@@ -206,6 +221,20 @@ songSchema.pre('validate', async function (next) {
   // Keep the chord index in step with the content on every save.
   this.arrangements?.forEach((a) => { a.chords = extractChords(a.content); });
 
+  /*
+   * And the searchable words alongside it: chord tokens and section markers
+   * removed, whitespace collapsed. Every living arrangement contributes, so a
+   * second version with different words is findable too.
+   */
+  this.searchLyrics = (this.arrangements || [])
+    .filter((a) => !a.deletedAt)
+    .map((a) => a.content || '')
+    .join('\n')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 20000);
+
   if (this.history?.length > MAX_HISTORY) {
     this.history = this.history.slice(-MAX_HISTORY);
   }
@@ -289,8 +318,8 @@ songSchema.methods.toPublic = function (arrangementId = null, { withContent = fa
 
 // Weighted so a title match outranks a match buried in the lyrics.
 songSchema.index(
-  { title: 'text', 'arrangements.content': 'text' },
-  { weights: { title: 10, 'arrangements.content': 1 }, name: 'song_search' }
+  { title: 'text', searchLyrics: 'text' },
+  { weights: { title: 10, searchLyrics: 1 }, name: 'song_search' }
 );
 
 /**
