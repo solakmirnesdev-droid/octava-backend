@@ -20,6 +20,23 @@ import '../../src/models/Artist.js';
 import Song from '../../src/models/Song.js';
 import Artist from '../../src/models/Artist.js';
 
+/*
+ * AI-DECISION: two daemons were taken out of the nightly run on 2026-08-31 and
+ * locked behind OCTAVA_DOZVOLI_RUSENJE=DA. Neither is deleted; both still run
+ * by hand, deliberately.
+ *
+ *   Deep-Forensic-Lyrics  — scraped lyrics off tekstovi.net, tekstomanija.com
+ *     and genius.com every night. Whether the catalogue takes third-party
+ *     lyrics is Mirnes's call, not something a daemon should decide at 3am.
+ *
+ *   Catalog-Deduplicator  — Artist.deleteOne(), a HARD delete that walks past
+ *     the trash and the SIGURAN SAM modal. Worse, its notion of a duplicate was
+ *     unreliable: most "duplicate" artists turned out to be one row carrying a
+ *     stale searchName after a rename, not a duplicate at all. It has probably
+ *     been deleting innocent artists for a while.
+ *
+ * See KATALOG.md §6.
+ */
 const SERVICES = [
   { name: 'Quadrant-1-TopDown', script: 'scripts/healers/healer_q1_top_down.js' },
   { name: 'Quadrant-2-MidUp', script: 'scripts/healers/healer_q2_mid_up.js' },
@@ -27,14 +44,12 @@ const SERVICES = [
   { name: 'Quadrant-4-BottomUp', script: 'scripts/healers/healer_q4_bottom_up.js' },
   { name: 'Year-Genre-Enricher', script: 'scripts/healers/year_and_genre_enricher.js' },
   { name: 'Smart-Mood-Tagger', script: 'scripts/healers/smart_mood_and_playlist_tagger.js' },
-  { name: 'Deep-Forensic-Lyrics', script: 'scripts/healers/lyrics_completer.js' },
   { name: 'Key-Detector-Healer', script: 'scripts/healers/key_detector_healer.js', args: ['--daemon', '--write'] },
   { name: 'Ghost-Section-Purger', script: 'scripts/healers/ghost_section_purger.js' },
   { name: 'RealTime-Watcher', script: 'scripts/daemons/realtime_gate_watcher.js' },
   { name: 'Portrait-Enricher', script: 'scripts/healers/artist_portrait_enricher.js' },
   { name: 'Country-Enricher', script: 'scripts/healers/artist_country_enricher.js' },
   { name: 'YouTube-Matcher', script: 'scripts/daemons/youtube_matcher_daemon.js' },
-  { name: 'Catalog-Deduplicator', script: 'scripts/daemons/auto_deduplicator_daemon.js' },
   { name: 'Anomaly-Hunter-2.0', script: 'scripts/healers/anomaly_discovery_healer.js' },
   { name: 'Auto-Backup-Daemon', script: 'scripts/daemons/auto_backup_daemon.js' }
 ];

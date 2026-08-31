@@ -254,6 +254,16 @@ Tri skripte trajno brišu podatke i **niko ih ne poziva**. Traže
 - `scripts/healers/heal_nonexistent_and_foreign_artists.js` — `deleteMany` koji
   zaobilazi kantu i modal `SIGURAN SAM`
 
+Od 2026-08-31 zaključane su još dvije, i **izvađene iz noćnog rada**:
+
+- `daemons/auto_deduplicator_daemon.js` — `Artist.deleteOne()`, tvrdo brisanje
+  mimo kante. Njegov pojam duplikata je bio nepouzdan: većina „duplih"
+  izvođača bio je jedan red sa zastarjelim `searchName` poslije preimenovanja
+  (§5.15), a ne duplikat. Vjerovatno je brisao nedužne izvođače.
+- `healers/lyrics_completer.js` — skidao tekstove s tekstovi.net,
+  tekstomanija.com i genius.com svake noći. Da li katalog uzima tuđe tekstove
+  je Mirnesova odluka, ne stvar koju demon rješava u tri ujutro.
+
 Prve dvije su legitimne restore skripte — zato zaključane, ne obrisane.
 **Ako ti se čini da ti treba jedna od njih, ne treba ti.** Pitaj Mirnesa.
 
@@ -332,7 +342,22 @@ uživo), ponekad pogrešno dodijeljen video. Ručno.
 ## 7b. Noćni rad (desktop)
 
 ```bash
-npm run master        # 16 demona, cijelu noć
+npm run master        # 14 demona, cijelu noć — SVE NA LOKALNOJ BAZI
+```
+
+Nijedan noćni demon ne dodiruje Atlas. Svi čitaju `.env` i rade na lokalnom
+katalogu desktopa.
+
+**Prva noć poslije popravke kvadranata je posebna.** Do 2026-08-31 pola
+kataloga nikad nije obrađeno (§5.16). Sada ide svih 14.389, pa prepisivač
+gramatike i dijakritika prvi put dira ~7.190 pjesama odjednom. **Ne puštaj to
+naslijepo** — pusti jedan kvadrant par minuta, prekini, pa uporedi:
+
+```bash
+node scripts/katalog.js > /tmp/prije.txt
+node scripts/healers/healer_q1_top_down.js     # Ctrl+C poslije 2 min
+node scripts/katalog.js > /tmp/poslije.txt
+diff /tmp/prije.txt /tmp/poslije.txt
 ```
 
 Dvije stvari su popravljene 2026-08-31 i moraju ostati takve:
