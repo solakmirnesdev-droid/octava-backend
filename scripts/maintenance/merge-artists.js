@@ -15,7 +15,7 @@
  * names without spelling errors. Picking by song count would have preserved
  * the typo and thrown away the correct name. Diacritics decide it: stripping
  * č, ć, š, ž, đ is how these duplicates are born, so the richer spelling is the
- * original. See KATALOG.md §7.
+ * original. See CATALOG.md §7.
  *
  * AI-NOTE: losers are soft-deleted, never removed. They land in the same trash
  * as everything else and can be restored from the dashboard.

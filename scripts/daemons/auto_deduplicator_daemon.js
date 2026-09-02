@@ -5,9 +5,9 @@ import '../../src/models/Artist.js';
 import Artist from '../../src/models/Artist.js';
 import Song from '../../src/models/Song.js';
 import { cleanArtistName, cleanOfficialTitle, normalizeTitleForDeduplication, countChordsInContent, isDummyContent } from '../healers/song_quality_gate.js';
-import { potvrdi } from '../lib/potvrdi.js';
+import { confirmDestructive } from '../lib/confirm.js';
 
-potvrdi('Artist.deleteOne() — tvrdo brise izvodjace, mimo kante i modala SIGURAN SAM');
+confirmDestructive('Artist.deleteOne() — hard-deletes artists, bypassing the trash and the SIGURAN SAM modal');
 
 const SLEEP_MS = 500;
 

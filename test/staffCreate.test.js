@@ -39,9 +39,9 @@ const newAccount = (over = {}) => ({
  * Before this route the only path was a shell script on the server, so these
  * cover the door itself: who may open it, and what it refuses to let through.
  */
-describe('superadmin pravi naloge za dashboard', () => {
+describe('the superadmin creates dashboard accounts', () => {
   for (const role of ['worker', 'admin']) {
-    test(`${role} ne moze napraviti nalog`, async () => {
+    test(`${role} cannot create an account`, async () => {
       const token = await signIn(role);
       const res = await api('/accounts/staff', {
         method: 'POST', token, body: newAccount()
@@ -53,13 +53,13 @@ describe('superadmin pravi naloge za dashboard', () => {
     });
   }
 
-  test('bez prijave nema kreiranja', async () => {
+  test('no creating without signing in', async () => {
     const res = await api('/accounts/staff', { method: 'POST', body: newAccount() });
     assert.equal(res.status, 401);
   });
 
   for (const role of ['worker', 'admin', 'superadmin']) {
-    test(`superadmin pravi nalog uloge ${role}`, async () => {
+    test(`the superadmin creates a ${role} account`, async () => {
       const token = await signIn('superadmin');
       const res = await api('/accounts/staff', {
         method: 'POST', token, body: newAccount({ role, email: `${role}-novi@test.local` })
@@ -79,7 +79,7 @@ describe('superadmin pravi naloge za dashboard', () => {
    * person can actually get in with it. A created account that cannot sign in
    * would pass every other assertion here.
    */
-  test('novi nalog se stvarno moze prijaviti na dashboard', async () => {
+  test('the new account can actually sign in to the dashboard', async () => {
     const token = await signIn('superadmin');
     const account = newAccount({ role: 'admin' });
     await api('/accounts/staff', { method: 'POST', token, body: account });
@@ -94,7 +94,7 @@ describe('superadmin pravi naloge za dashboard', () => {
     assert.equal(login.body.user.email, account.email);
   });
 
-  test('email se ne moze duplirati', async () => {
+  test('the email cannot be duplicated', async () => {
     const token = await signIn('superadmin');
     await api('/accounts/staff', { method: 'POST', token, body: newAccount() });
     const again = await api('/accounts/staff', { method: 'POST', token, body: newAccount({ name: 'Neko Drugi' }) });
@@ -103,7 +103,7 @@ describe('superadmin pravi naloge za dashboard', () => {
     assert.equal(await Staff.countDocuments({ email: 'novi@test.local' }), 1);
   });
 
-  test('email se ne moze duplirati ni drugim pisanjem velikih slova', async () => {
+  test('the email cannot be duplicated with different capitalization either', async () => {
     const token = await signIn('superadmin');
     await api('/accounts/staff', { method: 'POST', token, body: newAccount() });
     const again = await api('/accounts/staff', {
@@ -113,7 +113,7 @@ describe('superadmin pravi naloge za dashboard', () => {
     assert.equal(again.status, 409);
   });
 
-  test('kratka lozinka je odbijena', async () => {
+  test('a short password is refused', async () => {
     const token = await signIn('superadmin');
     const res = await api('/accounts/staff', {
       method: 'POST', token, body: newAccount({ password: 'kratka12' })
@@ -123,7 +123,7 @@ describe('superadmin pravi naloge za dashboard', () => {
     assert.equal(await Staff.countDocuments({ email: 'novi@test.local' }), 0);
   });
 
-  test('nepoznata uloga je odbijena', async () => {
+  test('an unknown role is refused', async () => {
     const token = await signIn('superadmin');
     const res = await api('/accounts/staff', {
       method: 'POST', token, body: newAccount({ role: 'vlasnik' })
@@ -133,7 +133,7 @@ describe('superadmin pravi naloge za dashboard', () => {
     assert.equal(await Staff.countDocuments({ email: 'novi@test.local' }), 0);
   });
 
-  test('kreiranje ostavlja trag u reviziji', async () => {
+  test('creating leaves an audit trail entry', async () => {
     const token = await signIn('superadmin');
     await api('/accounts/staff', { method: 'POST', token, body: newAccount({ role: 'admin' }) });
 

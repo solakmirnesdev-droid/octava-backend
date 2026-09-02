@@ -31,8 +31,8 @@ async function trail(token, params = '') {
   return res.body.entries || [];
 }
 
-describe('trag: izvodjaci', () => {
-  test('dodavanje, izmjena i brisanje ostavljaju zapis', async () => {
+describe('audit trail: artists', () => {
+  test('adding, editing and deleting all leave a record', async () => {
     const token = await login('admin');
 
     const made = await api('/artists', {
@@ -51,7 +51,7 @@ describe('trag: izvodjaci', () => {
     assert.ok(actions.includes('delete'), 'brisanje nije zabiljezeno');
   });
 
-  test('izmjena nosi staru i novu vrijednost', async () => {
+  test('an edit carries the old and the new value', async () => {
     const token = await login('admin');
     const made = await api('/artists', { method: 'POST', token, body: { name: 'Prvo Ime', country: 'BA' } });
 
@@ -66,7 +66,7 @@ describe('trag: izvodjaci', () => {
     assert.ok(entry.changes.find((c) => c.field === 'country' && c.to === 'RS'));
   });
 
-  test('ime izvodjaca prezivi brisanje', async () => {
+  test('the artist name survives deletion', async () => {
     const token = await login('admin');
     const made = await api('/artists', { method: 'POST', token, body: { name: 'Nestali' } });
     await api(`/artists/${made.body.artist._id}`, { method: 'DELETE', token });
@@ -77,8 +77,8 @@ describe('trag: izvodjaci', () => {
   });
 });
 
-describe('trag: nalozi', () => {
-  test('promjena uloge biljezi ko, kome i sa cega na sta', async () => {
+describe('audit trail: accounts', () => {
+  test('a role change records who, to whom, and from what to what', async () => {
     const root = await login('superadmin');
     const worker = await Staff.findOne({ email: 'worker@test.local' })
       || await Staff.create({
@@ -100,7 +100,7 @@ describe('trag: nalozi', () => {
     assert.equal(role.to, 'admin');
   });
 
-  test('deaktivacija se biljezi', async () => {
+  test('deactivation is recorded', async () => {
     const root = await login('superadmin');
     const worker = await Staff.create({
       email: 'drugi@test.local', name: 'Drugi', role: 'worker',
@@ -114,7 +114,7 @@ describe('trag: nalozi', () => {
   });
 });
 
-describe('trag: moderacija', () => {
+describe('audit trail: moderation', () => {
   async function aReview(token) {
     const song = await api('/songs', {
       method: 'POST', token,
@@ -132,7 +132,7 @@ describe('trag: moderacija', () => {
     return Review.findOne();
   }
 
-  test('sakrivanje biljezi razlog', async () => {
+  test('hiding records the reason', async () => {
     const token = await login('admin');
     const review = await aReview(token);
 
@@ -147,7 +147,7 @@ describe('trag: moderacija', () => {
     assert.ok(entry.entityLabel.startsWith('Dobri akordi'), 'zapis ne kaze sta je sakriveno');
   });
 
-  test('otkrivanje se biljezi kao zasebna radnja', async () => {
+  test('unhiding is recorded as a separate action', async () => {
     const token = await login('admin');
     const review = await aReview(token);
 
@@ -162,8 +162,8 @@ describe('trag: moderacija', () => {
   });
 });
 
-describe('trag: verzije pjesama', () => {
-  test('brisanje i vracanje verzije ostavljaju zapis sa imenom pjesme', async () => {
+describe('audit trail: song versions', () => {
+  test('deleting and restoring a version leave a record with the song name', async () => {
     const token = await login('admin');
     const song = await api('/songs', {
       method: 'POST', token,

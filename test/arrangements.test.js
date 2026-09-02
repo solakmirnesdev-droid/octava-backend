@@ -35,15 +35,15 @@ async function setup() {
 const addOne = (slug, token, body) =>
   api(`/songs/${slug}/arrangements`, { method: 'POST', token, body });
 
-describe('verzije pjesme', () => {
-  test('nova pjesma pocinje sa jednom verzijom koja je glavna', async () => {
+describe('song versions', () => {
+  test('a new song starts with one version, and it is the main one', async () => {
     const { slug } = await setup();
     const res = await api(`/songs/${slug}`);
     assert.equal(res.body.song.arrangements.length, 1);
     assert.equal(res.body.song.arrangements[0].isPrimary, true);
   });
 
-  test('dodana verzija ne preuzima glavnu ulogu', async () => {
+  test('an added version does not take over as main', async () => {
     const { slug, token } = await setup();
     await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
 
@@ -53,7 +53,7 @@ describe('verzije pjesme', () => {
     assert.equal(primary.label, 'Osnovna verzija', 'glavna se ne smije promijeniti sama');
   });
 
-  test('bez izbora se cita glavna, sa izborom trazena', async () => {
+  test('without a choice the main one is read, with one the requested', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const second = added.body.song.arrangements.find((a) => !a.isPrimary);
@@ -66,20 +66,20 @@ describe('verzije pjesme', () => {
     assert.equal(picked.body.song.originalKey, 'C');
   });
 
-  test('nepostojeci izbor pada nazad na glavnu umjesto da puca', async () => {
+  test('a missing choice falls back to the main one instead of throwing', async () => {
     const { slug } = await setup();
     const res = await api(`/songs/${slug}?arrangement=000000000000000000000000`);
     assert.equal(res.status, 200);
     assert.equal(res.body.song.content, '[Am]osnovni tekst');
   });
 
-  test('tekst i tonalitet su obavezni', async () => {
+  test('lyrics and key are required', async () => {
     const { slug, token } = await setup();
     const res = await addOne(slug, token, { label: 'Bez teksta' });
     assert.equal(res.status, 400);
   });
 
-  test('promjena glavne ostavlja tacno jednu glavnu', async () => {
+  test('changing the main one leaves exactly one main', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const second = added.body.song.arrangements.find((a) => !a.isPrimary);
@@ -93,7 +93,7 @@ describe('verzije pjesme', () => {
     assert.equal(flagged[0].label, 'Lakša');
   });
 
-  test('brisanje glavne promovise drugu', async () => {
+  test('deleting the main one promotes another', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const primary = added.body.song.arrangements.find((a) => a.isPrimary);
@@ -105,7 +105,7 @@ describe('verzije pjesme', () => {
       'bez ovoga glavna ostaje nepostavljena i redoslijed odlucuje');
   });
 
-  test('posljednja verzija se ne moze obrisati', async () => {
+  test('the last version cannot be deleted', async () => {
     const { slug, token } = await setup();
     const only = (await api(`/songs/${slug}`)).body.song.arrangements[0];
 
@@ -113,7 +113,7 @@ describe('verzije pjesme', () => {
     assert.equal(res.status, 409);
   });
 
-  test('brisanje verzije cuva njene glasove i sklanja je sa sajta', async () => {
+  test('deleting a version keeps its votes and takes it off the site', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const second = added.body.song.arrangements.find((a) => !a.isPrimary);
@@ -142,7 +142,7 @@ describe('verzije pjesme', () => {
       'glasovi su unisteni, a verzija se moze vratiti');
   });
 
-  test('obrisana verzija se moze vratiti sa svojim ocjenama', async () => {
+  test('a deleted version can be restored with its ratings', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const second = added.body.song.arrangements.find((a) => !a.isPrimary);
@@ -158,7 +158,7 @@ describe('verzije pjesme', () => {
     assert.equal(back.body.song.arrangements.length, 2);
   });
 
-  test('brisanje ne oslobadja mjesto ispod granice od sest', async () => {
+  test('deleting does not free a slot below the limit of six', async () => {
     const { slug, token } = await setup();
     // One exists already, so five more fills the song.
     for (let i = 2; i <= 6; i++) {
@@ -177,7 +177,7 @@ describe('verzije pjesme', () => {
     assert.equal(added.body.song.arrangements.length, 6);
   });
 
-  test('ocjene se vode odvojeno po verziji', async () => {
+  test('ratings are tracked separately per version', async () => {
     const { slug, token } = await setup();
     const added = await addOne(slug, token, { label: 'Lakša', content: '[C]lakše', originalKey: 'C' });
     const primary = added.body.song.arrangements.find((a) => a.isPrimary);
@@ -200,7 +200,7 @@ describe('verzije pjesme', () => {
     assert.equal(byId[String(second._id)].rating, 1);
   });
 
-  test('radnik moze, citalac ne moze', async () => {
+  test('a worker can, a reader cannot', async () => {
     const { slug } = await setup();
     const reader = await api('/auth/register', {
       method: 'POST',

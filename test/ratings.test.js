@@ -42,8 +42,8 @@ async function setup(readers = 1) {
   return { slug: created.body.song.slug, tokens };
 }
 
-describe('ocjenjivanje', () => {
-  test('prva ocjena postavlja prosjek', async () => {
+describe('rating', () => {
+  test('the first rating sets the average', async () => {
     const { slug, tokens } = await setup(1);
 
     const res = await api(`/songs/${slug}/rating`, {
@@ -56,7 +56,7 @@ describe('ocjenjivanje', () => {
     assert.equal(res.body.rating.mine, 4);
   });
 
-  test('prosjek vise glasova', async () => {
+  test('the average of several votes', async () => {
     const { slug, tokens } = await setup(3);
     for (const [i, value] of [5, 4, 3].entries()) {
       await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[i], body: { value } });
@@ -67,7 +67,7 @@ describe('ocjenjivanje', () => {
     assert.equal(res.body.rating.average, 4);
   });
 
-  test('promjena ocjene pomjera zbir, ne broj glasova', async () => {
+  test('changing a rating moves the sum, not the vote count', async () => {
     const { slug, tokens } = await setup(2);
     await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[0], body: { value: 2 } });
     await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[1], body: { value: 4 } });
@@ -82,7 +82,7 @@ describe('ocjenjivanje', () => {
     assert.equal(res.body.rating.average, 4.5);
   });
 
-  test('povlacenje ocjene vraca oboje', async () => {
+  test('withdrawing a rating restores both', async () => {
     const { slug, tokens } = await setup(2);
     await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[0], body: { value: 5 } });
     await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[1], body: { value: 1 } });
@@ -93,7 +93,7 @@ describe('ocjenjivanje', () => {
     assert.equal(res.body.rating.mine, null);
   });
 
-  test('brojevi se ne mogu spustiti ispod nule', async () => {
+  test('the numbers cannot be pushed below zero', async () => {
     const { slug, tokens } = await setup(1);
     await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[0], body: { value: 3 } });
     await api(`/songs/${slug}/rating`, { method: 'DELETE', token: tokens[0] });
@@ -107,21 +107,21 @@ describe('ocjenjivanje', () => {
   });
 });
 
-describe('sta se odbija', () => {
-  test('glasanje trazi nalog', async () => {
+describe('what gets refused', () => {
+  test('voting requires an account', async () => {
     const { slug } = await setup(0);
     const res = await api(`/songs/${slug}/rating`, { method: 'POST', body: { value: 5 } });
     assert.equal(res.status, 401);
   });
 
-  test('prosjek je javan', async () => {
+  test('the average is public', async () => {
     const { slug } = await setup(0);
     const res = await api(`/songs/${slug}/rating`);
     assert.equal(res.status, 200);
     assert.equal(res.body.rating.mine, null);
   });
 
-  test('vrijednosti izvan opsega', async () => {
+  test('out-of-range values', async () => {
     const { slug, tokens } = await setup(1);
     for (const value of [0, 6, -1, 2.5, 'pet', null]) {
       const res = await api(`/songs/${slug}/rating`, {
@@ -131,7 +131,7 @@ describe('sta se odbija', () => {
     }
   });
 
-  test('jedan glas po citaocu, koliko god puta poslao', async () => {
+  test('one vote per reader, however many times they send it', async () => {
     const { slug, tokens } = await setup(1);
     for (let i = 0; i < 5; i++) {
       await api(`/songs/${slug}/rating`, { method: 'POST', token: tokens[0], body: { value: 5 } });

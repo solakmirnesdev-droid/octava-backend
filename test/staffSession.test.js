@@ -36,13 +36,13 @@ const lifetimeMinutes = (token) => {
  * expiry is only ever reached by going idle. These pin both halves: that it is
  * genuinely short, and that renewal needs a session that is still alive.
  */
-describe('sesija uredništva traje kratko i obnavlja se', () => {
-  test('token se izdaje na 60 minuta, ne na 7 dana', async () => {
+describe('the editorial session is short and renewable', () => {
+  test('the token is issued for 60 minutes, not 7 days', async () => {
     const token = await signIn();
     assert.equal(lifetimeMinutes(token), 60);
   });
 
-  test('javni nalog i dalje dobija dugu sesiju', async () => {
+  test('a public account still gets a long session', async () => {
     const email = 'citalac@test.local';
     await api('/auth/register', {
       method: 'POST', body: { email, password: PASSWORD, username: 'citalac' }
@@ -54,7 +54,7 @@ describe('sesija uredništva traje kratko i obnavlja se', () => {
     assert.ok(lifetimeMinutes(res.body.token) > 60, 'citaocu je skracena sesija');
   });
 
-  test('obnova vraća novi upotrebljiv token', async () => {
+  test('renewal returns a new usable token', async () => {
     const token = await signIn();
     const res = await api('/auth/staff/renew', { method: 'POST', token });
 
@@ -68,12 +68,12 @@ describe('sesija uredništva traje kratko i obnavlja se', () => {
     assert.equal(me.body.user.role, 'admin');
   });
 
-  test('obnova bez prijave je odbijena', async () => {
+  test('renewal without signing in is refused', async () => {
     const res = await api('/auth/staff/renew', { method: 'POST' });
     assert.equal(res.status, 401);
   });
 
-  test('istekao token se ne moze obnoviti', async () => {
+  test('an expired token cannot be renewed', async () => {
     const staff = await Staff.create({
       email: 'istekao@test.local', name: 'Istekao', role: 'admin',
       passwordHash: await Staff.hashPassword(PASSWORD)
@@ -89,7 +89,7 @@ describe('sesija uredništva traje kratko i obnavlja se', () => {
     assert.equal(res.status, 401);
   });
 
-  test('deaktiviran nalog ne moze obnoviti sesiju', async () => {
+  test('a deactivated account cannot renew a session', async () => {
     const token = await signIn();
     await Staff.updateOne({ email: 'admin@test.local' }, { $set: { active: false } });
 

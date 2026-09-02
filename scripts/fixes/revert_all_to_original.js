@@ -3,9 +3,9 @@ import { MongoClient } from 'mongodb';
 import { EJSON } from 'bson';
 import { gunzipSync } from 'node:zlib';
 import fs from 'node:fs';
-import { potvrdi } from '../lib/potvrdi.js';
+import { confirmDestructive } from '../lib/confirm.js';
 
-potvrdi('vraća SVE kolekcije iz snimka i briše sve što je nastalo poslije njega');
+confirmDestructive('restores ALL collections from a snapshot and deletes everything created after it');
 
 const URI = process.env.MONGODB_URI;
 const target = 'octava';

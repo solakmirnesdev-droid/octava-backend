@@ -27,8 +27,8 @@ async function requestReset() {
   return account;
 }
 
-describe('trazenje linka', () => {
-  test('odgovor je isti za postojeci i nepostojeci nalog', async () => {
+describe('requesting a link', () => {
+  test('the response is the same for an existing and a missing account', async () => {
     await api('/auth/register', { method: 'POST', body: READER });
 
     const known = await api('/auth/forgot', { method: 'POST', body: { email: READER.email } });
@@ -40,7 +40,7 @@ describe('trazenje linka', () => {
     assert.deepEqual(known.body, unknown.body);
   });
 
-  test('token se cuva hashiran, nikad u citljivom obliku', async () => {
+  test('the token is stored hashed, never in readable form', async () => {
     const account = await requestReset();
 
     assert.ok(account.resetTokenHash, 'token nije zabiljezen');
@@ -48,15 +48,15 @@ describe('trazenje linka', () => {
     assert.ok(account.resetTokenExpiresAt > new Date(), 'rok vec istekao');
   });
 
-  test('rok trajanja je ogranicen', async () => {
+  test('the lifetime is capped', async () => {
     const account = await requestReset();
     const minutes = (account.resetTokenExpiresAt - Date.now()) / 60000;
     assert.ok(minutes > 0 && minutes <= 60, `rok je ${minutes} minuta`);
   });
 });
 
-describe('postavljanje nove lozinke', () => {
-  test('ispravan token mijenja lozinku', async () => {
+describe('setting a new password', () => {
+  test('a valid token changes the password', async () => {
     const account = await requestReset();
 
     // Drive the flow with a token the test controls, verified against the
@@ -81,7 +81,7 @@ describe('postavljanje nove lozinke', () => {
     assert.equal(fresh.status, 200);
   });
 
-  test('token vrijedi samo jednom', async () => {
+  test('the token is valid only once', async () => {
     const account = await requestReset();
     const raw = 'jednokratni-token';
     account.resetTokenHash = hashResetToken(raw);
@@ -95,7 +95,7 @@ describe('postavljanje nove lozinke', () => {
     assert.equal(second.status, 400);
   });
 
-  test('istekao token se odbija', async () => {
+  test('an expired token is refused', async () => {
     const account = await requestReset();
     const raw = 'istekli-token';
     account.resetTokenHash = hashResetToken(raw);
@@ -106,7 +106,7 @@ describe('postavljanje nove lozinke', () => {
     assert.equal(res.status, 400);
   });
 
-  test('izmisljen token se odbija', async () => {
+  test('a made-up token is refused', async () => {
     await requestReset();
     const res = await api('/auth/reset', {
       method: 'POST', body: { token: 'nikad-izdat', password: NEW_PASSWORD }
@@ -114,7 +114,7 @@ describe('postavljanje nove lozinke', () => {
     assert.equal(res.status, 400);
   });
 
-  test('kratka lozinka se odbija', async () => {
+  test('a short password is refused', async () => {
     const account = await requestReset();
     const raw = 'token-za-kratku';
     account.resetTokenHash = hashResetToken(raw);
@@ -125,8 +125,8 @@ describe('postavljanje nove lozinke', () => {
   });
 });
 
-describe('postojece sesije', () => {
-  test('prestaju vrijediti nakon promjene lozinke', async () => {
+describe('existing sessions', () => {
+  test('stop being valid after a password change', async () => {
     const registered = await api('/auth/register', { method: 'POST', body: READER });
     const token = registered.body.token;
 

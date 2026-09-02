@@ -12,8 +12,8 @@ before(async () => {
 after(stop);
 beforeEach(reset);
 
-describe('rubrike', () => {
-  test('prazna rubrika se ne nudi u navigaciji', async () => {
+describe('sections', () => {
+  test('an empty section is not offered in navigation', async () => {
     await Genre.create({ name: 'Puna', slug: 'puna', kind: 'region', songCount: 5 });
     await Genre.create({ name: 'Prazna', slug: 'prazna', kind: 'region', songCount: 0 });
 
@@ -26,7 +26,7 @@ describe('rubrike', () => {
     assert.equal(names.includes('Prazna'), false, 'prazna rubrika se i dalje nudi');
   });
 
-  test('vraca se sama cim dobije pjesmu', async () => {
+  test('it comes back on its own as soon as it gets a song', async () => {
     const genre = await Genre.create({ name: 'Kasnija', slug: 'kasnija', kind: 'style', songCount: 0 });
     assert.equal((await api('/genres')).body.genres.length, 0);
 
@@ -34,7 +34,7 @@ describe('rubrike', () => {
     assert.equal((await api('/genres')).body.genres.length, 1);
   });
 
-  test('grupisanje po vrsti i dalje radi', async () => {
+  test('grouping by kind still works', async () => {
     await Genre.create({ name: 'Domaća', slug: 'domaca', kind: 'region', songCount: 3 });
     await Genre.create({ name: 'Rock', slug: 'rock', kind: 'style', songCount: 7 });
 
@@ -44,8 +44,8 @@ describe('rubrike', () => {
   });
 });
 
-describe('filter po tagu', () => {
-  test('vraca samo pjesme s tim tagom', async () => {
+describe('filter by tag', () => {
+  test('returns only songs with that tag', async () => {
     const Staff = (await import('../src/models/Staff.js')).default;
     await Staff.create({
       email: 'radnik@test.local', name: 'Radnik', role: 'worker',
@@ -71,7 +71,7 @@ describe('filter po tagu', () => {
     assert.equal(tagged.body.songs[0].title, 'Sa oznakom');
   });
 
-  test('nepoznat tag vraca prazno, ne sve', async () => {
+  test('an unknown tag returns empty, not everything', async () => {
     const res = await api('/songs?tag=nepostojeci');
     assert.equal(res.body.songs.length, 0);
   });

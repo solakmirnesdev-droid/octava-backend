@@ -1,6 +1,6 @@
 # AI-NOTES — octava-backend
 
-> **Poliranje kataloga:** radna knjiga je [KATALOG.md](./KATALOG.md) —
+> **Poliranje kataloga:** radna knjiga je [CATALOG.md](./CATALOG.md) —
 > izmjereno stanje, red posla i zamke. Ulaz u alat je `npm run katalog`.
 
 > **Entry file for every AI session on this project.** Read this first, before

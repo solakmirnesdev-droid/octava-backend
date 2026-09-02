@@ -22,8 +22,8 @@ async function reader() {
   return res.body.token;
 }
 
-describe('sacuvani izvodjaci', () => {
-  test('spasavanje i uklanjanje', async () => {
+describe('saved artists', () => {
+  test('saving and removing', async () => {
     const token = await reader();
     const artist = await Artist.create({ name: 'Neko', slug: 'neko' });
 
@@ -42,7 +42,7 @@ describe('sacuvani izvodjaci', () => {
     assert.equal((await Artist.findById(artist._id)).favoriteCount, 0);
   });
 
-  test('dvostruko spasavanje ne naduva brojac', async () => {
+  test('saving twice does not inflate the counter', async () => {
     const token = await reader();
     const artist = await Artist.create({ name: 'Dvaput', slug: 'dvaput' });
 
@@ -53,7 +53,7 @@ describe('sacuvani izvodjaci', () => {
     assert.equal((await Artist.findById(artist._id)).favoriteCount, 1, 'brojac je naduvan');
   });
 
-  test('brojac ne pada ispod nule', async () => {
+  test('the counter does not fall below zero', async () => {
     const token = await reader();
     const artist = await Artist.create({ name: 'Nula', slug: 'nula' });
 
@@ -62,20 +62,20 @@ describe('sacuvani izvodjaci', () => {
     assert.equal((await Artist.findById(artist._id)).favoriteCount, 0);
   });
 
-  test('nepostojeci izvodjac se odbija', async () => {
+  test('a nonexistent artist is refused', async () => {
     const token = await reader();
     const res = await api('/me/artists/6a8cdb4bf1c8dba32c0bb647', { method: 'POST', token });
     assert.equal(res.status, 404);
     assert.equal((await User.findOne()).favoriteArtists.length, 0);
   });
 
-  test('trazi prijavu', async () => {
+  test('requires signing in', async () => {
     const artist = await Artist.create({ name: 'Zakljucan', slug: 'zakljucan' });
     assert.equal((await api(`/me/artists/${artist._id}`, { method: 'POST' })).status, 401);
     assert.equal((await api('/me/artists')).status, 401);
   });
 
-  test('sacuvane pjesme i izvodjaci se ne mijesaju', async () => {
+  test('saved songs and artists do not mix', async () => {
     const token = await reader();
     const artist = await Artist.create({ name: 'Odvojeno', slug: 'odvojeno' });
     await api(`/me/artists/${artist._id}`, { method: 'POST', token });
@@ -86,7 +86,7 @@ describe('sacuvani izvodjaci', () => {
   });
 });
 
-describe('sacuvane pjesme', () => {
+describe('saved songs', () => {
   async function aSong() {
     await Staff.create({
       email: 'radnik@test.local', name: 'Radnik', role: 'worker',
@@ -102,7 +102,7 @@ describe('sacuvane pjesme', () => {
     return res.body.song._id;
   }
 
-  test('dvostruko spasavanje ne naduva brojac', async () => {
+  test('saving twice does not inflate the counter', async () => {
     const token = await reader();
     const id = await aSong();
 
@@ -119,7 +119,7 @@ describe('sacuvane pjesme', () => {
     assert.equal((await api('/me/favorites', { token })).body.songs.length, 1);
   });
 
-  test('dvostruko uklanjanje ne obara brojac ispod nule', async () => {
+  test('removing twice does not push the counter below zero', async () => {
     const token = await reader();
     const id = await aSong();
 

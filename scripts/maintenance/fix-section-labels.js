@@ -26,7 +26,7 @@
  * asked, because it is the one repair that can silently move chords. It was
  * written only after sampling the matches: the rule that first found this
  * counted 3,564 songs, and 2,609 of those were "[Prelaz / Solo]:" — a healthy
- * label with a colon. The real number is 600. See KATALOG.md §5.
+ * label with a colon. The real number is 600. See CATALOG.md §5.
  */
 import 'dotenv/config';
 import Song from '../../src/models/Song.js';

@@ -22,7 +22,7 @@ import Artist from '../../src/models/Artist.js';
 
 /*
  * AI-DECISION: two daemons were taken out of the nightly run on 2026-08-31 and
- * locked behind OCTAVA_DOZVOLI_RUSENJE=DA. Neither is deleted; both still run
+ * locked behind OCTAVA_ALLOW_DESTRUCTIVE=YES. Neither is deleted; both still run
  * by hand, deliberately.
  *
  *   Deep-Forensic-Lyrics  — scraped lyrics off tekstovi.net, tekstomanija.com
@@ -35,7 +35,7 @@ import Artist from '../../src/models/Artist.js';
  *     stale searchName after a rename, not a duplicate at all. It has probably
  *     been deleting innocent artists for a while.
  *
- * See KATALOG.md §6.
+ * See CATALOG.md §6.
  */
 const SERVICES = [
   { name: 'Quadrant-1-TopDown', script: 'scripts/healers/healer_q1_top_down.js' },

@@ -37,8 +37,8 @@ const addSong = (token, title, artist = 'Testni') => api('/songs', {
   body: { title, artist, content: '[Am]tekst', originalKey: 'Am', status: 'published' }
 });
 
-describe('obavjestenje o dodanoj pjesmi', () => {
-  test('nastaje, i nosi ko je dodao i s kojom ulogom', async () => {
+describe('notification for an added song', () => {
+  test('is created, and carries who added it and with which role', async () => {
     const token = await signIn('admin', 'ana');
     const res = await addSong(token, 'Nova pjesma');
     assert.equal(res.status, 201);
@@ -59,7 +59,7 @@ describe('obavjestenje o dodanoj pjesmi', () => {
    * "unknown added a song" once an account is closed records nothing, which is
    * the same reason AuditLog copies them.
    */
-  test('prezivljava gasenje naloga koji ju je dodao', async () => {
+  test('survives the shutdown of the account that added it', async () => {
     const token = await signIn('worker', 'bane');
     await addSong(token, 'Ostaje zapisano');
 
@@ -71,7 +71,7 @@ describe('obavjestenje o dodanoj pjesmi', () => {
     assert.equal(n.actorRole, 'worker');
   });
 
-  test('stize u nepricitane na spisku obavjestenja', async () => {
+  test('arrives as unread in the notification list', async () => {
     const author = await signIn('admin', 'ana');
     await addSong(author, 'Vidljiva');
 
@@ -89,7 +89,7 @@ describe('obavjestenje o dodanoj pjesmi', () => {
     assert.ok(count.body.unread >= 1, 'ne broji se kao neprocitano');
   });
 
-  test('jedna pjesma daje tacno jedno obavjestenje', async () => {
+  test('one song gives exactly one notification', async () => {
     const token = await signIn('admin', 'ana');
     await addSong(token, 'Prva');
     await addSong(token, 'Druga');

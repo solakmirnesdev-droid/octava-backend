@@ -7,28 +7,35 @@
  * run is somebody, or some agent, typing the filename. This gate makes that
  * require a sentence you cannot type by accident. It does not make the scripts
  * safe; it makes them deliberate. See AGENTS.md, "Rad s katalogom".
+ *
+ * AI-TRAP: the environment variable is the whole mechanism. It was renamed
+ * from OCTAVA_DOZVOLI_RUSENJE=DA on 2026-09-02, so any older note, shell
+ * history entry or agent transcript carrying the previous incantation will now
+ * be ignored and the script will stop instead of running. That is the safe
+ * direction to fail, but it is why the old name must not be quietly re-added.
  */
-export function potvrdi(sta) {
-  const dozvola = process.env.OCTAVA_DOZVOLI_RUSENJE;
-  if (dozvola === 'DA') return;
+export function confirmDestructive(what) {
+  const allowed = process.env.OCTAVA_ALLOW_DESTRUCTIVE;
+  if (allowed === 'YES') return;
 
   console.error(`
   ┌────────────────────────────────────────────────────────────┐
-  │  ZAUSTAVLJENO                                              │
+  │  STOPPED                                                   │
   └────────────────────────────────────────────────────────────┘
 
-  Ova skripta TRAJNO BRIŠE PODATKE:
+  This script PERMANENTLY DESTROYS DATA:
 
-      ${sta}
+      ${what}
 
-  Ako baza nije pokvarena, ovo NIJE skripta koju tražiš.
-  Za svakodnevni rad na katalogu koristi:
+  If the database is not broken, this is NOT the script you want.
+  For everyday work on the catalogue use:
 
       npm run katalog
 
-  Ako stvarno vraćaš bazu iz backupa, pokreni ponovo ovako:
+  If you really are restoring the database from a backup, run it again
+  like this:
 
-      OCTAVA_DOZVOLI_RUSENJE=DA node ${process.argv[1]?.split('/').slice(-3).join('/')}
+      OCTAVA_ALLOW_DESTRUCTIVE=YES node ${process.argv[1]?.split('/').slice(-3).join('/')}
 `);
   process.exit(1);
 }

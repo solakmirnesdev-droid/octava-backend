@@ -94,8 +94,8 @@ async function makeSong(title) {
   });
 }
 
-describe('indeksiranje', () => {
-  test('otisak se sprema i vidi u popisu', async () => {
+describe('indexing', () => {
+  test('a fingerprint is stored and shows up in the listing', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     const print = printOf(PIECES.a);
@@ -109,7 +109,7 @@ describe('indeksiranje', () => {
     assert.equal(listed.body.prints[0].stale, false);
   });
 
-  test('audio nikad ne stigne do servera', async () => {
+  test('the audio never reaches the server', async () => {
     // What is stored has to be the packed integers and nothing else — the
     // licensing answer and the storage answer are the same answer.
     const token = await signIn();
@@ -122,20 +122,20 @@ describe('indeksiranje', () => {
     assert.equal(stored.hashes.length % 6, 0);
   });
 
-  test('bez prijave se ne moze indeksirati', async () => {
+  test('indexing requires signing in', async () => {
     const song = await makeSong('Prva');
     const res = await bytes(`/recognize/${song._id}?seconds=30`, printOf(PIECES.a), { method: 'PUT' });
     assert.equal(res.status, 401);
   });
 
-  test('otisak koji nije djeljiv sa sest se odbija', async () => {
+  test('a fingerprint not divisible by six is refused', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     const res = await bytes(`/recognize/${song._id}?seconds=30`, Buffer.alloc(7), { method: 'PUT', token });
     assert.equal(res.status, 400);
   });
 
-  test('trajanje je obavezno', async () => {
+  test('duration is required', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     const res = await bytes(`/recognize/${song._id}`, printOf(PIECES.a), { method: 'PUT', token });
@@ -143,14 +143,14 @@ describe('indeksiranje', () => {
   });
 });
 
-describe('prepoznavanje', () => {
-  test('prazan indeks to i kaze', async () => {
+describe('recognition', () => {
+  test('an empty index says so', async () => {
     const res = await bytes('/recognize', clipOf(PIECES.a, 5, 8));
     assert.equal(res.body.match, null);
     assert.equal(res.body.reason, 'empty');
   });
 
-  test('isjecak nalazi svoju pjesmu', async () => {
+  test('a clip finds its own song', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     await bytes(`/recognize/${song._id}?seconds=30`, printOf(PIECES.a), { method: 'PUT', token });
@@ -163,7 +163,7 @@ describe('prepoznavanje', () => {
       `pozicija ${res.body.match.atSecond} nije blizu 9s`);
   });
 
-  test('tudji isjecak ne daje pogodbu', async () => {
+  test('a clip from elsewhere gives no match', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     await bytes(`/recognize/${song._id}?seconds=30`, printOf(PIECES.a), { method: 'PUT', token });
@@ -173,18 +173,18 @@ describe('prepoznavanje', () => {
     assert.equal(res.body.reason, 'unsure');
   });
 
-  test('prazno tijelo se odbija', async () => {
+  test('an empty body is refused', async () => {
     assert.equal((await bytes('/recognize', Buffer.alloc(0))).status, 400);
   });
 });
 
-describe('kes', () => {
+describe('the cache', () => {
   /**
    * AI-TRAP: the cache in front of matching is the one thing here that fails
    * silently. Left stale it keeps answering with the print a song used to have,
    * which looks like a working feature returning a wrong answer.
    */
-  test('zamijenjen otisak se odmah primjenjuje', async () => {
+  test('a replaced fingerprint applies immediately', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
 
@@ -197,7 +197,7 @@ describe('kes', () => {
     assert.equal((await bytes('/recognize', clipOf(PIECES.b, 9, 8))).body.match?.slug, song.slug);
   });
 
-  test('obrisan otisak prestaje da se poklapa', async () => {
+  test('a deleted fingerprint stops matching', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     await bytes(`/recognize/${song._id}?seconds=30`, printOf(PIECES.a), { method: 'PUT', token });
@@ -208,8 +208,8 @@ describe('kes', () => {
   });
 });
 
-describe('offline kopija', () => {
-  test('vraca manifest i bajtove u jednom odgovoru', async () => {
+describe('the offline copy', () => {
+  test('returns the manifest and the bytes in one response', async () => {
     const token = await signIn();
     const song = await makeSong('Prva');
     const print = printOf(PIECES.a);
@@ -224,7 +224,7 @@ describe('offline kopija', () => {
     assert.equal(res.raw.length, 4 + headerBytes + print.length);
   });
 
-  test('bez popisa pjesama ne salje cijelu biblioteku', async () => {
+  test('without a song list it does not send the whole library', async () => {
     assert.equal((await bytes('/recognize/offline', undefined, { method: 'GET' })).status, 400);
   });
 });

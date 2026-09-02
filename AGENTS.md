@@ -69,7 +69,7 @@ workflow. Before writing any UI:
 
 ## Rad s katalogom — čitaj prije nego dodirneš `scripts/`
 
-**Puna radna knjiga je [KATALOG.md](./KATALOG.md)** — izmjereno stanje svih
+**Puna radna knjiga je [CATALOG.md](./CATALOG.md)** — izmjereno stanje svih
 14.400 pjesama, red posla, i devet izmjerenih zamki. Pročitaj je prije nego
 napišeš ijedno pravilo. Ovo ispod je sažetak.
 
@@ -119,7 +119,7 @@ pravilo prijavilo zdrave podatke kao pokvarene:
 ### Zaključane skripte
 
 Tri skripte trajno brišu podatke i niko ih ne poziva. Traže
-`OCTAVA_DOZVOLI_RUSENJE=DA`:
+`OCTAVA_ALLOW_DESTRUCTIVE=YES`:
 
 - `fixes/revert_all_to_original.js`, `fixes/clean_revert_final.js` — vraćanje
   iz backupa; ruše kolekcije prije upisa.

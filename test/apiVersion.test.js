@@ -14,8 +14,8 @@ beforeEach(reset);
  * instead of on the `api` router, it works perfectly on the website, and it is
  * simply absent from every phone. Nothing would notice; the site would be fine.
  */
-describe('verzija API-ja', () => {
-  test('/api/v1 odgovara isto sto i /api', async () => {
+describe('API version', () => {
+  test('/api/v1 answers the same as /api', async () => {
     const paths = ['/songs?limit=1', '/artists?limit=1', '/genres', '/plans', '/footer', '/version'];
 
     for (const path of paths) {
@@ -29,7 +29,7 @@ describe('verzija API-ja', () => {
     }
   });
 
-  test('svaka montirana ruta postoji i pod v1', async () => {
+  test('every mounted route exists under v1 too', async () => {
     // Reaching one path but not the other is the exact mistake this guards.
     const resources = [
       'songs', 'artists', 'genres', 'plans', 'stats', 'footer',
@@ -47,7 +47,7 @@ describe('verzija API-ja', () => {
     }
   });
 
-  test('version kaze koja je verzija i sta trazi od klijenta', async () => {
+  test('version says which version it is and what it needs from the client', async () => {
     const res = await api('/v1/version');
     assert.equal(res.status, 200);
     assert.equal(res.body.api, 'v1');
@@ -57,7 +57,7 @@ describe('verzija API-ja', () => {
     assert.ok('notice' in res.body);
   });
 
-  test('nepoznata verzija je 404, ne tiho preusmjerenje', async () => {
+  test('an unknown version is a 404, not a silent redirect', async () => {
     // A client asking for v2 must be told plainly, not quietly handed v1.
     assert.equal((await api('/v2/songs')).status, 404);
   });

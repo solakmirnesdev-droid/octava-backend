@@ -31,21 +31,21 @@ function fakeWebp() {
 }
 
 
-describe('registracija sa drzavom', () => {
-  test('drzava je neobavezna', async () => {
+describe('signup with a country', () => {
+  test('the country is optional', async () => {
     const { status, user } = await signUp();
     assert.equal(status, 201);
     assert.equal(user.country, null);
     assert.equal(user.flag, null);
   });
 
-  test('kad se posalje, vraca se sa zastavicom', async () => {
+  test('when sent, it comes back with a flag', async () => {
     const { user } = await signUp({ country: 'ba' });
     assert.equal(user.country, 'BA');
     assert.equal(user.flag, '🇧🇦');
   });
 
-  test('neispravna oznaka se odbija', async () => {
+  test('an invalid code is refused', async () => {
     const res = await api('/auth/register', {
       method: 'POST',
       body: { email: 'drugi@test.local', password: 'lozinka1234', username: 'Drugi', country: 'Bosna' }
@@ -55,8 +55,8 @@ describe('registracija sa drzavom', () => {
   });
 });
 
-describe('profil', () => {
-  test('cita se i mijenja ime i drzava', async () => {
+describe('the profile', () => {
+  test('name and country are read and changed', async () => {
     const { token } = await signUp();
 
     const mine = await api('/me', { token });
@@ -68,7 +68,7 @@ describe('profil', () => {
     assert.equal(changed.body.user.flag, '🇭🇷');
   });
 
-  test('prazna drzava je brise, izostavljena je ne dira', async () => {
+  test('an empty country clears it, an omitted one leaves it alone', async () => {
     const { token } = await signUp({ country: 'BA' });
 
     await api('/me', { method: 'PATCH', token, body: { username: 'Isti' } });
@@ -78,13 +78,13 @@ describe('profil', () => {
     assert.equal((await api('/me', { token })).body.user.country, null);
   });
 
-  test('prekratko ime se odbija', async () => {
+  test('a name that is too short is refused', async () => {
     const { token } = await signUp();
     const res = await api('/me', { method: 'PATCH', token, body: { username: 'a' } });
     assert.equal(res.status, 400);
   });
 
-  test('email se nikad ne salje uz tudju recenziju', async () => {
+  test('the email is never sent alongside a review by someone else', async () => {
     const { token } = await signUp();
     const staff = await import('../src/models/Staff.js').then((m) => m.default);
     await staff.create({
@@ -110,14 +110,14 @@ describe('profil', () => {
   });
 });
 
-describe('promjena adrese', () => {
-  test('trazi lozinku', async () => {
+describe('changing the email address', () => {
+  test('requires the password', async () => {
     const { token } = await signUp();
     const res = await api('/me/email', { method: 'PATCH', token, body: { email: 'nova@test.local' } });
     assert.equal(res.status, 400);
   });
 
-  test('pogresna lozinka ne mijenja nista', async () => {
+  test('a wrong password changes nothing', async () => {
     const { token } = await signUp();
     const res = await api('/me/email', {
       method: 'PATCH', token, body: { email: 'nova@test.local', password: 'pogresna1234' }
@@ -126,7 +126,7 @@ describe('promjena adrese', () => {
     assert.ok(await User.findOne({ email: 'citalac@test.local' }));
   });
 
-  test('tacna lozinka mijenja adresu i skida potvrdu', async () => {
+  test('the right password changes the address and clears the confirmation', async () => {
     const { token } = await signUp();
     await User.updateOne({ email: 'citalac@test.local' }, { emailVerified: true });
 
@@ -138,7 +138,7 @@ describe('promjena adrese', () => {
     assert.equal(res.body.user.emailVerified, false, 'nova adresa je ostala oznacena kao potvrdjena');
   });
 
-  test('zauzeta adresa se odbija', async () => {
+  test('an address already taken is refused', async () => {
     await api('/auth/register', {
       method: 'POST', body: { email: 'zauzeta@test.local', password: 'lozinka1234', username: 'Neko' }
     });
@@ -151,8 +151,8 @@ describe('promjena adrese', () => {
   });
 });
 
-describe('promjena lozinke', () => {
-  test('trazi trenutnu i mijenja na novu', async () => {
+describe('changing the password', () => {
+  test('asks for the current one and changes to the new one', async () => {
     const { token } = await signUp();
 
     const wrong = await api('/me/password', {
@@ -171,7 +171,7 @@ describe('promjena lozinke', () => {
     assert.equal(login.status, 200);
   });
 
-  test('vraca svjezu sesiju, pa te ne izbaci sa stranice', async () => {
+  test('returns a fresh session, so it does not throw you off the page', async () => {
     const { token } = await signUp();
     const res = await api('/me/password', {
       method: 'PATCH', token, body: { currentPassword: 'lozinka1234', newPassword: 'novalozinka1' }
@@ -184,7 +184,7 @@ describe('promjena lozinke', () => {
     assert.equal(after.status, 200);
   });
 
-  test('stara sesija prestaje vaziti', async () => {
+  test('the old session stops being valid', async () => {
     const { token } = await signUp();
     await api('/me/password', {
       method: 'PATCH', token, body: { currentPassword: 'lozinka1234', newPassword: 'novalozinka1' }
@@ -194,7 +194,7 @@ describe('promjena lozinke', () => {
     assert.equal(old.status, 401, 'stara sesija je prezivjela promjenu lozinke');
   });
 
-  test('prekratka nova lozinka se odbija', async () => {
+  test('a new password that is too short is refused', async () => {
     const { token } = await signUp();
     const res = await api('/me/password', {
       method: 'PATCH', token, body: { currentPassword: 'lozinka1234', newPassword: 'kratka' }
@@ -203,7 +203,7 @@ describe('promjena lozinke', () => {
   });
 });
 
-describe('slika profila', () => {
+describe('the profile picture', () => {
   /** Raw bytes, so this cannot go through the JSON helper. */
   const putAvatar = (token, buf, type = 'image/webp') =>
     fetch(`${base}/me/avatar`, {
@@ -212,7 +212,7 @@ describe('slika profila', () => {
       body: buf
     });
 
-  test('prima WebP i onda je javno dostupna', async () => {
+  test('accepts WebP and then serves it publicly', async () => {
     const { token, user } = await signUp();
     assert.equal(user.hasAvatar, false);
 
@@ -227,7 +227,7 @@ describe('slika profila', () => {
     assert.equal(served.headers.get('content-type'), 'image/webp');
   });
 
-  test('odbija sto nije WebP, ma sta zaglavlje tvrdilo', async () => {
+  test('refuses anything that is not WebP, whatever the header claims', async () => {
     const { token } = await signUp();
     // A JPEG renamed and announced as WebP: the header lies, the bytes do not.
     const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 0, 0, 0, 0, 0]);
@@ -235,7 +235,7 @@ describe('slika profila', () => {
     assert.equal(res.status, 415);
   });
 
-  test('brisanje je vraca na pocetno stanje', async () => {
+  test('deleting returns it to the initial state', async () => {
     const { token, user } = await signUp();
     await putAvatar(token, fakeWebp());
 
@@ -245,7 +245,7 @@ describe('slika profila', () => {
     assert.equal((await fetch(`${base}/users/${user.id}/avatar`)).status, 404);
   });
 
-  test('nalog bez slike vraca 404, ne prazan odgovor', async () => {
+  test('an account with no picture returns 404, not an empty response', async () => {
     const { user } = await signUp();
     assert.equal((await fetch(`${base}/users/${user.id}/avatar`)).status, 404);
   });

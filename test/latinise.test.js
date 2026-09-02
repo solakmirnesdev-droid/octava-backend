@@ -25,51 +25,51 @@ async function login() {
   return res.body.token;
 }
 
-describe('preslovljavanje', () => {
-  test('srpska cirilica', () => {
+describe('transliteration', () => {
+  test('Serbian Cyrillic', () => {
     assert.equal(toLatin('Ђорђе Марјановић'), 'Đorđe Marjanović');
     assert.equal(toLatin('Џаба љубав њена'), 'Džaba ljubav njena');
     assert.equal(toLatin('Ћirilica'), 'Ćirilica');
   });
 
-  test('makedonska cirilica', () => {
+  test('Macedonian Cyrillic', () => {
     assert.equal(toLatin('Во една пролет'), 'Vo edna prolet');
     assert.equal(toLatin('Тоше Проески'), 'Toše Proeski');
     assert.equal(toLatin('Ѓорѓи'), 'Gjorgji');
   });
 
-  test('ruska cirilica daje nase pismo, ne englesko', () => {
+  test('Russian Cyrillic gives our alphabet, not the English one', () => {
     assert.equal(toLatin('Девушка моего города'), 'Devuška moego goroda');
     assert.equal(toLatin('Маленькая девочка'), 'Malenkaja devočka');
     // Not "Devushka" — the site spells this sound š everywhere else.
     assert.ok(!toLatin('Девушка').includes('sh'));
   });
 
-  test('velika slova kod dvoslova zavise od sljedeceg slova', () => {
+  test('capitalization of digraphs depends on the next letter', () => {
     assert.equal(toLatin('Љубав'), 'Ljubav');
     assert.equal(toLatin('ЉУБАВ'), 'LJUBAV');
     assert.equal(toLatin('Његош'), 'Njegoš');
   });
 
-  test('latinicni tekst prolazi netaknut', () => {
+  test('Latin text passes untouched', () => {
     const text = '[Am]Snijeg pade na be[Dm]har, na voće — čćžšđ 123!?';
     assert.equal(toLatin(text), text);
   });
 
-  test('homoglif usred latinicnog teksta', () => {
+  test('a homoglyph in the middle of Latin text', () => {
     // A Cyrillic 'а' hiding in "sela": invisible to the eye, unsearchable.
     const broken = 'nema selаmeta';
     assert.ok(hasCyrillic(broken));
     assert.equal(toLatin(broken), 'nema selameta');
   });
 
-  test('ne dira interpunkciju ni ChordPro oznake', () => {
+  test('does not touch punctuation or ChordPro markers', () => {
     assert.equal(toLatin('[Am]За кого?'), '[Am]Za kogo?');
   });
 });
 
-describe('brana na modelu', () => {
-  test('naslov se preslovi pri snimanju', async () => {
+describe('the guard on the model', () => {
+  test('the title is transliterated on save', async () => {
     const token = await login();
     const res = await api('/songs', {
       method: 'POST', token,
@@ -83,7 +83,7 @@ describe('brana na modelu', () => {
     assert.equal(res.body.song.title, 'Vo edna prolet');
   });
 
-  test('slug se gradi od latinice, ne od praznog niza', async () => {
+  test('the slug is built from Latin, not from an empty string', async () => {
     const token = await login();
     const res = await api('/songs', {
       method: 'POST', token,
@@ -99,7 +99,7 @@ describe('brana na modelu', () => {
     assert.ok(!res.body.song.slug.startsWith('pjesma'));
   });
 
-  test('tekst pjesme se cisti, oznake akorda ostaju', async () => {
+  test('the lyrics are cleaned, the chord markers stay', async () => {
     const token = await login();
     const res = await api('/songs', {
       method: 'POST', token,
@@ -113,7 +113,7 @@ describe('brana na modelu', () => {
     assert.equal(song.arrangements[0].content, '[Am]nema selameta\n[Dm]Za kogo?');
   });
 
-  test('cirilicno ime izvodjaca ne pravi dvojnika', async () => {
+  test('a Cyrillic artist name does not create a duplicate', async () => {
     const token = await login();
 
     await api('/songs', {
@@ -130,7 +130,7 @@ describe('brana na modelu', () => {
     assert.equal(artists[0].songCount, 2);
   });
 
-  test('nista u bazi ne ostaje na cirilici', async () => {
+  test('nothing in the database stays in Cyrillic', async () => {
     const token = await login();
     await api('/songs', {
       method: 'POST', token,

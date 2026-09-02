@@ -52,7 +52,7 @@ async function makeSong() {
 const linesOf = (s) => String(s || '').split('\n').filter((l) => l.trim()).length;
 
 describe('paywall', () => {
-  test('iskljucen gate vraca cijeli sadrzaj', async () => {
+  test('a disabled gate returns the whole content', async () => {
     process.env.PAYWALL_ENABLED = 'false';
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`);
@@ -72,7 +72,7 @@ describe('paywall', () => {
    * visitor who is not signed in. Not a shortened version, not a first verse —
    * nothing readable. The blur on the page is decoration; this is the lock.
    */
-  test('neprijavljen ne dobija nijednu rijec ni akord', async () => {
+  test('a signed-out visitor gets neither a word nor a chord', async () => {
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`);
 
@@ -96,7 +96,7 @@ describe('paywall', () => {
     assert.deepEqual(res.body.song.chords, []);
   });
 
-  test('akordi izlaze kao [X], slova kao x, oblik ostaje', async () => {
+  test('chords come out as [X], letters as x, the shape stays', async () => {
     // Masking rather than omitting is the whole point: word lengths and
     // punctuation survive, the words do not.
     const artist = await Artist.create({ name: 'Oblik' });
@@ -116,7 +116,7 @@ describe('paywall', () => {
     assert.equal(lines[1], '[X]xxxx xxxx x xxxxx xx [X]xxxx');
   });
 
-  test('oznaceni list zadrzava sekcije, ali nijednu rijec', async () => {
+  test('a masked sheet keeps its sections but not one word', async () => {
     const artist = await Artist.create({ name: 'Oznaceni' });
     const song = await Song.create({
       title: 'Sa sekcijama', artist: artist._id, status: 'published',
@@ -140,7 +140,7 @@ describe('paywall', () => {
     }
   });
 
-  test('list bez akorda se ne zakljucava', async () => {
+  test('a sheet with no chords is not locked', async () => {
     /*
      * 594 songs carry only "Tekst još uvijek nije ažuriran." while they wait to
      * be written up. Masking that sentence produced "xxxxx xxx xxxxxx xxxx
@@ -158,7 +158,7 @@ describe('paywall', () => {
     assert.equal(body.song.content, 'Tekst još uvijek nije ažuriran.');
   });
 
-  test('pretplatnik dobija tacno ono sto je upisano', async () => {
+  test('a subscriber gets exactly what was written', async () => {
     // The other half of the same guarantee: masking must not survive payment.
     const token = await reader('platio@test.local');
     await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
@@ -172,7 +172,7 @@ describe('paywall', () => {
     assert.ok(res.body.song.chords.length > 0);
   });
 
-  test('strip akorda ne odaje nista', async () => {
+  test('stripping chords gives nothing away', async () => {
     // Otherwise the strip under the sheet hands over, in a neat list, exactly
     // what the sheet is hiding — the chords are the product here, not the words.
     const slug = await makeSong();
@@ -194,7 +194,7 @@ describe('paywall', () => {
    * exercised below, with the setting flipped, so it cannot rot while it is
    * switched off.
    */
-  test('prijava je dovoljna dok zid trazi nalog', async () => {
+  test('signing in is enough while the wall asks for an account', async () => {
     const token = await reader();
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`, { token });
@@ -204,7 +204,7 @@ describe('paywall', () => {
     assert.ok(res.body.song.chords.length > 0);
   });
 
-  test('kad zid trazi pretplatu, sama prijava nije dovoljna', async () => {
+  test('when the wall asks for a subscription, signing in alone is not enough', async () => {
     process.env.PAYWALL_REQUIRES = 'subscription';
     try {
       const token = await reader();
@@ -215,7 +215,7 @@ describe('paywall', () => {
     }
   });
 
-  test('pretplacen vidi sve', async () => {
+  test('a subscriber sees everything', async () => {
     const token = await reader();
     const slug = await makeSong();
 
@@ -228,7 +228,7 @@ describe('paywall', () => {
     assert.equal(linesOf(res.body.song.content), 7);
   });
 
-  test('osoblje ne mora placati katalog koji uredjuje', async () => {
+  test('staff do not pay for the catalogue they edit', async () => {
     const token = await staffToken();
     const slug = await makeSong();
     const res = await api(`/songs/${slug}`, { token });
@@ -236,8 +236,8 @@ describe('paywall', () => {
   });
 });
 
-describe('zivotni vijek pretplate', () => {
-  test('otkazivanje ne oduzima ono sto je placeno', async () => {
+describe('subscription lifetime', () => {
+  test('cancelling does not take away what was paid for', async () => {
     const token = await reader();
     await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
 
@@ -250,7 +250,7 @@ describe('zivotni vijek pretplate', () => {
     assert.equal((await api(`/songs/${slug}`, { token })).body.song.locked, false);
   });
 
-  test('istekla pretplata vise ne vrijedi, ma sta status kaze', async () => {
+  test('an expired subscription no longer counts, whatever the status says', async () => {
     // Only meaningful while the wall asks for payment.
     process.env.PAYWALL_REQUIRES = 'subscription';
     const token = await reader();
@@ -265,7 +265,7 @@ describe('zivotni vijek pretplate', () => {
     process.env.PAYWALL_REQUIRES = 'account';
   });
 
-  test('obnova dodaje na preostalo, ne brise ga', async () => {
+  test('renewal adds to what is left, it does not erase it', async () => {
     const token = await reader();
     const first = await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
     const second = await api('/me/subscription', { method: 'POST', token, body: { plan: 'monthly' } });
@@ -276,18 +276,18 @@ describe('zivotni vijek pretplate', () => {
   });
 });
 
-describe('sigurnost simulacije', () => {
-  test('bez prijave se ne moze pretplatiti', async () => {
+describe('simulation safety', () => {
+  test('subscribing requires signing in', async () => {
     assert.equal((await api('/me/subscription', { method: 'POST', body: { plan: 'monthly' } })).status, 401);
   });
 
-  test('nepoznat plan se odbija', async () => {
+  test('an unknown plan is refused', async () => {
     const token = await reader();
     const res = await api('/me/subscription', { method: 'POST', token, body: { plan: 'zauvijek' } });
     assert.equal(res.status, 400);
   });
 
-  test('van simulacije se pretplata ne poklanja', async () => {
+  test('outside simulation a subscription is not given away', async () => {
     // Only meaningful while the wall asks for payment.
     process.env.PAYWALL_REQUIRES = 'subscription';
     process.env.PAYMENTS_MODE = 'disabled';
@@ -300,7 +300,7 @@ describe('sigurnost simulacije', () => {
     process.env.PAYWALL_REQUIRES = 'account';
   });
 
-  test('cjenovnik je javan', async () => {
+  test('the price list is public', async () => {
     const res = await api('/plans');
     assert.equal(res.status, 200);
     assert.equal(res.body.plans.length, 2);

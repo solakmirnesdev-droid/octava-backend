@@ -20,8 +20,8 @@ before(start);
 after(stop);
 beforeEach(reset);
 
-describe('ogranicavanje pokusaja', () => {
-  test('promasaji se zaustavljaju, uspjesi ne', async () => {
+describe('limiting attempts', () => {
+  test('misses are stopped, successes are not', async () => {
     await api('/auth/register', { method: 'POST', body: READER });
 
     let blocked = 0;
@@ -37,7 +37,7 @@ describe('ogranicavanje pokusaja', () => {
     assert.ok(blocked > 0, 'neogranicen broj pokusaja');
   });
 
-  test('zakljucavanje jednog naloga ne dira drugi', async () => {
+  test('locking one account does not touch another', async () => {
     await api('/auth/register', { method: 'POST', body: READER });
     await api('/auth/register', {
       method: 'POST', body: { ...READER, email: 'drugi@test.local', username: 'Drugi' }

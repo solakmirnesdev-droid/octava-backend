@@ -51,8 +51,8 @@ async function enableEmail(token) {
   return on.body;
 }
 
-describe('ukljucivanje potvrde mailom', () => {
-  test('trazi lozinku', async () => {
+describe('turning on email confirmation', () => {
+  test('requires the password', async () => {
     const token = await makeStaff();
     const res = await api('/auth/staff/2fa/email/setup', {
       method: 'POST', token, body: { password: 'pogresna' }
@@ -60,7 +60,7 @@ describe('ukljucivanje potvrde mailom', () => {
     assert.equal(res.status, 401);
   });
 
-  test('kod iz maila ukljucuje faktor i daje rezervne kodove', async () => {
+  test('the emailed code enables the factor and gives backup codes', async () => {
     const token = await makeStaff();
     const body = await enableEmail(token);
     assert.equal(body.enabled, true);
@@ -70,7 +70,7 @@ describe('ukljucivanje potvrde mailom', () => {
     assert.equal(me.body.user.emailOtpEnabled, true);
   });
 
-  test('pogresan kod ne ukljucuje nista', async () => {
+  test('a wrong code enables nothing', async () => {
     const token = await makeStaff();
     await capture(() => api('/auth/staff/2fa/email/setup', { method: 'POST', token, body: { password: PASSWORD } }));
     const res = await api('/auth/staff/2fa/email/enable', { method: 'POST', token, body: { code: '000000' } });
@@ -79,8 +79,8 @@ describe('ukljucivanje potvrde mailom', () => {
   });
 });
 
-describe('prijava kodom iz maila', () => {
-  test('lozinka sama ne daje sesiju, kod stize mailom', async () => {
+describe('signing in with an emailed code', () => {
+  test('the password alone gives no session, the code arrives by email', async () => {
     const token = await makeStaff();
     await enableEmail(token);
 
@@ -99,7 +99,7 @@ describe('prijava kodom iz maila', () => {
     assert.ok(done.body.token);
   });
 
-  test('kod vrijedi jednom', async () => {
+  test('the code is valid once', async () => {
     const token = await makeStaff();
     await enableEmail(token);
     const { result, code } = await capture(() =>
@@ -113,7 +113,7 @@ describe('prijava kodom iz maila', () => {
     assert.equal(again.status, 400);
   });
 
-  test('pet pogresnih pokusaja spali kod', async () => {
+  test('five wrong attempts burn the code', async () => {
     // Six digits is a million values, which is not many when the attacker
     // already holds a valid challenge. The cap is the factor, not the entropy.
     const token = await makeStaff();
@@ -134,7 +134,7 @@ describe('prijava kodom iz maila', () => {
     assert.match(correct.body.message, /pokušaja/i);
   });
 
-  test('istekao kod se odbija', async () => {
+  test('an expired code is refused', async () => {
     const token = await makeStaff();
     await enableEmail(token);
     const { result, code } = await capture(() =>
@@ -152,7 +152,7 @@ describe('prijava kodom iz maila', () => {
     assert.match(res.body.message, /istekao/i);
   });
 
-  test('novi kod ponistava stari', async () => {
+  test('a new code invalidates the old one', async () => {
     const token = await makeStaff();
     await enableEmail(token);
     const first = await capture(() =>
@@ -173,7 +173,7 @@ describe('prijava kodom iz maila', () => {
     assert.equal(fresh.status, 200);
   });
 
-  test('rezervni kod i dalje radi uz email faktor', async () => {
+  test('a backup code still works with the email factor', async () => {
     const token = await makeStaff();
     const { backupCodes } = await enableEmail(token);
 
@@ -187,8 +187,8 @@ describe('prijava kodom iz maila', () => {
   });
 });
 
-describe('iskljucivanje', () => {
-  test('trazi lozinku i cisti kod', async () => {
+describe('turning it off', () => {
+  test('requires the password and clears the code', async () => {
     const token = await makeStaff();
     await enableEmail(token);
 

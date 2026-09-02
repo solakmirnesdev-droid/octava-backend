@@ -47,8 +47,8 @@ async function setup(readers = 1) {
   return { slug: created.body.song.slug, tokens, worker };
 }
 
-describe('recenzije', () => {
-  test('objavljena recenzija je odmah vidljiva', async () => {
+describe('reviews', () => {
+  test('a published review is visible immediately', async () => {
     const { slug, tokens } = await setup(1);
 
     const res = await api(`/songs/${slug}/reviews`, {
@@ -63,7 +63,7 @@ describe('recenzije', () => {
     assert.equal(list.body.total, 1);
   });
 
-  test('prekratak tekst se odbija', async () => {
+  test('text that is too short is refused', async () => {
     const { slug, tokens } = await setup(1);
     const res = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'x' }
@@ -71,7 +71,7 @@ describe('recenzije', () => {
     assert.equal(res.status, 400);
   });
 
-  test('samo razmaci se broje kao prazno', async () => {
+  test('whitespace only counts as empty', async () => {
     const { slug, tokens } = await setup(1);
     const res = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: '        ' }
@@ -79,7 +79,7 @@ describe('recenzije', () => {
     assert.equal(res.status, 400);
   });
 
-  test('druga recenzija iste pjesme mijenja prvu, ne dodaje novu', async () => {
+  test('a second review of the same song replaces the first, it does not add another', async () => {
     const { slug, tokens } = await setup(1);
     await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Prva verzija teksta.' }
@@ -95,7 +95,7 @@ describe('recenzije', () => {
     assert.ok(list.body.items[0].editedAt, 'editedAt mora biti postavljen');
   });
 
-  test('prijava je obavezna', async () => {
+  test('signing in is required', async () => {
     const { slug } = await setup(0);
     const res = await api(`/songs/${slug}/reviews`, {
       method: 'POST', body: { body: 'Bez naloga ovo ne prolazi.' }
@@ -103,7 +103,7 @@ describe('recenzije', () => {
     assert.equal(res.status, 401);
   });
 
-  test('autor uklanja svoju recenziju i ona nestaje iz javnog prikaza', async () => {
+  test('the author removes their review and it disappears from the public view', async () => {
     const { slug, tokens } = await setup(1);
     const created = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Ovo cu ukloniti.' }
@@ -118,7 +118,7 @@ describe('recenzije', () => {
     assert.equal(list.body.total, 0);
   });
 
-  test('tudja recenzija se ne moze ukloniti', async () => {
+  test('a review by someone else cannot be removed', async () => {
     const { slug, tokens } = await setup(2);
     const created = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Moja recenzija.' }
@@ -131,8 +131,8 @@ describe('recenzije', () => {
   });
 });
 
-describe('komentari na recenzije', () => {
-  test('komentar podize brojac na recenziji', async () => {
+describe('comments on reviews', () => {
+  test('a comment raises the counter on the review', async () => {
     const { slug, tokens } = await setup(2);
     const review = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Recenzija za komentarisanje.' }
@@ -147,7 +147,7 @@ describe('komentari na recenzije', () => {
     assert.equal(list.body.items[0].commentCount, 1);
   });
 
-  test('uklanjanje komentara spusta brojac', async () => {
+  test('removing a comment lowers the counter', async () => {
     const { slug, tokens } = await setup(2);
     const review = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Recenzija.' }
@@ -162,7 +162,7 @@ describe('komentari na recenzije', () => {
     assert.equal(list.body.items[0].commentCount, 0);
   });
 
-  test('uklanjanje recenzije povlaci i njene komentare', async () => {
+  test('removing a review takes its comments with it', async () => {
     const { slug, tokens } = await setup(2);
     const review = await api(`/songs/${slug}/reviews`, {
       method: 'POST', token: tokens[0], body: { body: 'Recenzija sa odgovorima.' }
@@ -179,8 +179,8 @@ describe('komentari na recenzije', () => {
   });
 });
 
-describe('moderacija', () => {
-  test('sakrivanje bez razloga se odbija', async () => {
+describe('moderation', () => {
+  test('hiding without a reason is refused', async () => {
     const { slug, tokens } = await setup(1);
     const admin = await staffToken('admin', 'urednik@test.local');
     const review = await api(`/songs/${slug}/reviews`, {
@@ -193,7 +193,7 @@ describe('moderacija', () => {
     assert.equal(res.status, 400);
   });
 
-  test('sakrivena recenzija nestaje iz javnog prikaza i biljezi ko je sakrio', async () => {
+  test('a hidden review disappears from the public view and records who hid it', async () => {
     const { slug, tokens } = await setup(1);
     const admin = await staffToken('admin', 'urednik@test.local');
     const review = await api(`/songs/${slug}/reviews`, {
@@ -214,7 +214,7 @@ describe('moderacija', () => {
     assert.equal(dash.body.items[0].moderatedBy.name, 'Osoba admin');
   });
 
-  test('autor ne moze izmjenom vratiti sakrivenu recenziju', async () => {
+  test('the author cannot bring a hidden review back by editing it', async () => {
     const { slug, tokens } = await setup(1);
     const admin = await staffToken('admin', 'urednik@test.local');
     const review = await api(`/songs/${slug}/reviews`, {
@@ -233,15 +233,15 @@ describe('moderacija', () => {
     assert.equal(list.body.total, 0);
   });
 
-  test('radnik nema pristup moderaciji', async () => {
+  test('a worker has no access to moderation', async () => {
     const { worker } = await setup(0);
     const res = await api('/moderation/reviews', { token: worker });
     assert.equal(res.status, 403);
   });
 });
 
-describe('obavjestenja', () => {
-  test('recenzija i komentar podizu obavjestenja', async () => {
+describe('notifications', () => {
+  test('a review and a comment raise notifications', async () => {
     const { slug, tokens } = await setup(2);
     const admin = await staffToken('admin', 'urednik@test.local');
 
@@ -269,7 +269,7 @@ describe('obavjestenja', () => {
     assert.ok(feed.body.unread >= 2, 'oba moraju biti neprocitana');
   });
 
-  test('oznaceno kao procitano se ne broji dvaput', async () => {
+  test('marked as read is not counted twice', async () => {
     const { slug, tokens } = await setup(1);
     const admin = await staffToken('admin', 'urednik@test.local');
     await api(`/songs/${slug}/reviews`, {
@@ -286,7 +286,7 @@ describe('obavjestenja', () => {
     assert.equal(row.readBy.length, 1, 'readBy ne smije rasti pri ponovnom oznacavanju');
   });
 
-  test('procitano je po clanu, ne globalno', async () => {
+  test('read state is per member, not global', async () => {
     const { slug, tokens } = await setup(1);
     const first = await staffToken('admin', 'prvi@test.local');
     const second = await staffToken('admin', 'drugi@test.local');

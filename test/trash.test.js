@@ -49,25 +49,25 @@ async function makeSong(title, artist, { deleted = false } = {}) {
 
 const bury = (artist) => Artist.updateOne({ _id: artist._id }, { deletedAt: new Date() });
 
-describe('pravo pristupa', () => {
-  test('bez prijave nema praznjenja', async () => {
+describe('access rights', () => {
+  test('no emptying without signing in', async () => {
     assert.equal((await api('/trash', { method: 'DELETE' })).status, 401);
   });
 
-  test('admin ne moze isprazniti kantu', async () => {
+  test('an admin cannot empty the trash', async () => {
     // Purging one song is superadmin; doing three hundred is not a smaller act.
     const token = await signIn('admin');
     assert.equal((await api('/trash', { method: 'DELETE', token })).status, 403);
   });
 
-  test('superadmin moze', async () => {
+  test('a superadmin can', async () => {
     const token = await signIn('superadmin');
     assert.equal((await api('/trash', { method: 'DELETE', token })).status, 200);
   });
 });
 
-describe('praznjenje', () => {
-  test('brise obrisano i ostavlja zivo', async () => {
+describe('emptying', () => {
+  test('deletes what was trashed and leaves the living', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Testni');
     await makeSong('Ziva', artist);
@@ -80,7 +80,7 @@ describe('praznjenje', () => {
     assert.deepEqual(left.map((s) => s.title), ['Ziva']);
   });
 
-  test('ocjene odlaze s pjesmom', async () => {
+  test('ratings go with the song', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Testni');
     const song = await makeSong('Obrisana', artist, { deleted: true });
@@ -97,7 +97,7 @@ describe('praznjenje', () => {
     assert.equal(await Rating.countDocuments(), 0);
   });
 
-  test('prazna kanta ne pukne', async () => {
+  test('an empty trash does not blow up', async () => {
     const token = await signIn('superadmin');
     const res = await api('/trash', { method: 'DELETE', token });
     assert.equal(res.body.songs, 0);
@@ -105,14 +105,14 @@ describe('praznjenje', () => {
   });
 });
 
-describe('siroces', () => {
+describe('orphans', () => {
   /**
    * AI-TRAP: the whole reason songs are purged before artists. An artist whose
    * catalogue is entirely in the trash counts zero living songs, so the
    * single-artist guard waves them through — and the trashed songs are left
    * pointing at an id that no longer resolves.
    */
-  test('izvodjac i njegove obrisane pjesme odlaze zajedno, pjesme prve', async () => {
+  test('an artist and their trashed songs go together, songs first', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Odlazi');
     await makeSong('Njegova', artist, { deleted: true });
@@ -125,7 +125,7 @@ describe('siroces', () => {
     assert.equal(await Artist.countDocuments().setOptions({ withDeleted: true }), 0);
   });
 
-  test('obrisan izvodjac sa zivom pjesmom ostaje', async () => {
+  test('a trashed artist with a living song stays', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Ostaje');
     await makeSong('Ziva', artist);
@@ -140,7 +140,7 @@ describe('siroces', () => {
 });
 
 
-describe('trajno brisanje jedne pjesme', () => {
+describe('permanently deleting a single song', () => {
   /**
    * AI-TRAP: this used to delete ratings and reviews and nothing else, so a
    * purged song left its comments, reports, notifications and fingerprint
@@ -149,7 +149,7 @@ describe('trajno brisanje jedne pjesme', () => {
    * narrower one was the button people actually press. Five orphaned
    * notifications were already sitting in the development database.
    */
-  test('nosi sa sobom sve sto pokazuje na nju', async () => {
+  test('takes everything pointing at it along', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Testni');
     const song = await makeSong('Ide zauvijek', artist, { deleted: true });
@@ -178,7 +178,7 @@ describe('trajno brisanje jedne pjesme', () => {
     }
   });
 
-  test('ne dira ono sto pripada drugoj pjesmi', async () => {
+  test('does not touch what belongs to another song', async () => {
     const token = await signIn('superadmin');
     const artist = await Artist.findOrCreateByName('Testni');
     const doomed = await makeSong('Ide', artist, { deleted: true });
@@ -195,8 +195,8 @@ describe('trajno brisanje jedne pjesme', () => {
   });
 });
 
-describe('brojac', () => {
-  test('kaze sta bi nestalo', async () => {
+describe('the counter', () => {
+  test('says what would disappear', async () => {
     const token = await signIn('admin');
     const artist = await Artist.findOrCreateByName('Testni');
     await makeSong('A', artist, { deleted: true });

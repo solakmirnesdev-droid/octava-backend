@@ -46,8 +46,8 @@ async function enrol() {
   return { token, secret, backupCodes: enabled.body.backupCodes };
 }
 
-describe('postavljanje drugog faktora', () => {
-  test('daje tajnu i QR kod', async () => {
+describe('setting up the second factor', () => {
+  test('gives a secret and a QR code', async () => {
     await Staff.create({
       email: EDITOR.email, name: EDITOR.name, role: 'worker',
       passwordHash: await Staff.hashPassword(EDITOR.password)
@@ -62,7 +62,7 @@ describe('postavljanje drugog faktora', () => {
     assert.match(res.body.qr, /^data:image\/png;base64,/);
   });
 
-  test('pogresan kod ne ukljucuje', async () => {
+  test('a wrong code does not enable it', async () => {
     await Staff.create({
       email: EDITOR.email, name: EDITOR.name, role: 'worker',
       passwordHash: await Staff.hashPassword(EDITOR.password)
@@ -81,7 +81,7 @@ describe('postavljanje drugog faktora', () => {
     assert.equal(staff.totpEnabled, false, 'ukljucen bez ispravnog koda');
   });
 
-  test('vraca deset rezervnih kodova, i to samo jednom', async () => {
+  test('returns ten backup codes, and only once', async () => {
     const { backupCodes } = await enrol();
     assert.equal(backupCodes.length, 10);
 
@@ -93,8 +93,8 @@ describe('postavljanje drugog faktora', () => {
   });
 });
 
-describe('dvokoracna prijava', () => {
-  test('lozinka sama ne daje sesiju', async () => {
+describe('two-step sign-in', () => {
+  test('the password alone does not give a session', async () => {
     await enrol();
     const res = await api('/auth/staff/login', {
       method: 'POST', body: { email: EDITOR.email, password: EDITOR.password }
@@ -105,7 +105,7 @@ describe('dvokoracna prijava', () => {
     assert.ok(res.body.challenge);
   });
 
-  test('medjukorak nije upotrebljiv kao sesija', async () => {
+  test('the intermediate step is not usable as a session', async () => {
     await enrol();
     const login = await api('/auth/staff/login', {
       method: 'POST', body: { email: EDITOR.email, password: EDITOR.password }
@@ -119,7 +119,7 @@ describe('dvokoracna prijava', () => {
     }
   });
 
-  test('tacan kod daje sesiju', async () => {
+  test('the right code gives a session', async () => {
     const { secret } = await enrol();
     const login = await api('/auth/staff/login', {
       method: 'POST', body: { email: EDITOR.email, password: EDITOR.password }
@@ -132,7 +132,7 @@ describe('dvokoracna prijava', () => {
     assert.ok(res.body.token);
   });
 
-  test('isti kod se ne moze upotrijebiti dvaput', async () => {
+  test('the same code cannot be used twice', async () => {
     const { secret } = await enrol();
     const code = codeFor(secret);
 
@@ -154,7 +154,7 @@ describe('dvokoracna prijava', () => {
     assert.equal(replay.status, 400, 'ponovljeni kod prihvacen');
   });
 
-  test('izmisljen medjukorak se odbija', async () => {
+  test('a made-up intermediate step is refused', async () => {
     await enrol();
     const res = await api('/auth/staff/login/verify', {
       method: 'POST', body: { challenge: 'nije.pravi.token', code: '123456' }
@@ -163,8 +163,8 @@ describe('dvokoracna prijava', () => {
   });
 });
 
-describe('rezervni kodovi', () => {
-  test('rade i trose se', async () => {
+describe('backup codes', () => {
+  test('work and get used up', async () => {
     const { backupCodes } = await enrol();
 
     const login = await api('/auth/staff/login', {
@@ -178,7 +178,7 @@ describe('rezervni kodovi', () => {
     assert.equal(used.body.backupCodesRemaining, 9);
   });
 
-  test('potroseni kod ne radi ponovo', async () => {
+  test('a spent code does not work again', async () => {
     const { backupCodes } = await enrol();
 
     for (const attempt of [0, 1]) {
@@ -193,8 +193,8 @@ describe('rezervni kodovi', () => {
   });
 });
 
-describe('iskljucivanje', () => {
-  test('trazi i lozinku, ne samo kod', async () => {
+describe('turning it off', () => {
+  test('asks for the password too, not just the code', async () => {
     const { token, secret } = await enrol();
 
     // A borrowed unlocked session must not be enough to strip the factor.

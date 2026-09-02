@@ -11,55 +11,55 @@ function run({ body, query, params } = {}) {
   return req;
 }
 
-describe('ciscenje operatora', () => {
-  test('operator u tijelu nestaje, ostatak ostaje', () => {
+describe('stripping operators', () => {
+  test('an operator in the body disappears, the rest stays', () => {
     const req = run({ body: { email: { $ne: null }, password: 'tajna' } });
     assert.deepEqual(req.body, { email: {}, password: 'tajna' });
   });
 
-  test('svi uobicajeni operatori', () => {
+  test('all the common operators', () => {
     const req = run({ body: { a: { $gt: '' }, b: { $regex: '.*' }, c: { $where: '1==1' } } });
     assert.deepEqual(req.body, { a: {}, b: {}, c: {} });
   });
 
-  test('tacka u kljucu takodje — dotirani put zalazi u poddokument', () => {
+  test('a dot in the key too — a dotted path reaches into a subdocument', () => {
     const req = run({ body: { 'user.role': 'admin', ime: 'Meho' } });
     assert.deepEqual(req.body, { ime: 'Meho' });
   });
 
-  test('zagadjenje prototipa', () => {
+  test('prototype pollution', () => {
     // Arrives in the same shape as an operator and deserves its own stop.
     const req = run({ body: JSON.parse('{"__proto__":{"admin":true},"ime":"Meho"}') });
     assert.deepEqual(Object.keys(req.body), ['ime']);
     assert.equal({}.admin, undefined, 'prototip je zagadjen');
   });
 
-  test('ugnijezdjeno se cisti do kraja', () => {
+  test('nested input is cleaned all the way down', () => {
     const req = run({ body: { filter: { nested: { $ne: 1 }, ok: 2 } } });
     assert.deepEqual(req.body, { filter: { nested: {}, ok: 2 } });
   });
 
-  test('nizovi se obilaze', () => {
+  test('arrays are walked', () => {
     const req = run({ body: { ids: [{ $ne: null }, 'abc'] } });
     assert.deepEqual(req.body, { ids: [{}, 'abc'] });
   });
 
-  test('obican zahtjev prolazi netaknut', () => {
+  test('an ordinary request passes untouched', () => {
     const body = { title: 'Emina', year: 1974, tags: ['sevdah'], nested: { a: 1 } };
     assert.deepEqual(run({ body: structuredClone(body) }).body, body);
   });
 
-  test('query i params takodje', () => {
+  test('query and params too', () => {
     const req = run({ query: { status: { $ne: 'published' } }, params: { $where: 'x', id: '5' } });
     assert.deepEqual(req.query, { status: {} });
     assert.deepEqual(req.params, { id: '5' });
   });
 
-  test('prazan zahtjev ne pada', () => {
+  test('an empty request does not fail', () => {
     assert.doesNotThrow(() => run({}));
   });
 
-  test('duboko ugnijezdjeno ne obara proces', () => {
+  test('deeply nested input does not bring the process down', () => {
     // Cheap to send, expensive to walk: the depth limit is what stops it.
     let deep = { $ne: 1 };
     for (let i = 0; i < 500; i++) deep = { nested: deep };

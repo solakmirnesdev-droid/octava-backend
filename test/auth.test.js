@@ -38,8 +38,8 @@ async function makeEditor(role = 'worker') {
  * realm throws nothing and logs nothing — it simply lets someone in, and the
  * only symptom is a reader holding editorial powers.
  */
-describe('razdvajanje naloga', () => {
-  test('registracija na sajtu ne pravi urednika', async () => {
+describe('keeping the two account worlds apart', () => {
+  test('signing up on the site does not create an editor', async () => {
     await makeReader();
     // The account must not exist in the editorial collection at all.
     assert.equal(await Staff.countDocuments({ email: READER.email }), 0);
@@ -51,7 +51,7 @@ describe('razdvajanje naloga', () => {
     assert.equal(res.status, 401);
   });
 
-  test('registracija ne moze zatraziti rolu', async () => {
+  test('signup cannot ask for a role', async () => {
     await api('/auth/register', {
       method: 'POST',
       body: { ...READER, role: 'admin', email: 'napadac@test.local' }
@@ -59,7 +59,7 @@ describe('razdvajanje naloga', () => {
     assert.equal(await Staff.countDocuments({}), 0);
   });
 
-  test('citalacki token ne prolazi kroz urednicke rute', async () => {
+  test('a reader token does not pass editorial routes', async () => {
     const token = await makeReader();
 
     for (const [path, options] of [
@@ -73,7 +73,7 @@ describe('razdvajanje naloga', () => {
     }
   });
 
-  test('urednicki token ne prolazi kroz citalacke rute', async () => {
+  test('an editorial token does not pass reader routes', async () => {
     const token = await makeEditor();
 
     for (const path of ['/auth/me', '/me/favorites']) {
@@ -82,7 +82,7 @@ describe('razdvajanje naloga', () => {
     }
   });
 
-  test('urednik i dalje moze uredjivati', async () => {
+  test('an editor can still edit', async () => {
     const token = await makeEditor();
     const res = await api('/songs', {
       method: 'POST',
@@ -92,7 +92,7 @@ describe('razdvajanje naloga', () => {
     assert.equal(res.status, 201);
   });
 
-  test('isti email moze postojati u oba svijeta bez preklapanja', async () => {
+  test('the same email can exist in both worlds without overlapping', async () => {
     // A person may be both a reader and an editor; the accounts stay separate.
     await Staff.create({
       email: READER.email, name: 'Isti', role: 'worker',
@@ -105,8 +105,8 @@ describe('razdvajanje naloga', () => {
   });
 });
 
-describe('prijava', () => {
-  test('pogresna lozinka i nepostojeci email daju istu poruku', async () => {
+describe('signing in', () => {
+  test('a wrong password and a missing email give the same message', async () => {
     await makeReader();
 
     const wrong = await api('/auth/login', {
@@ -121,21 +121,21 @@ describe('prijava', () => {
     assert.equal(wrong.body.message, missing.body.message);
   });
 
-  test('lozinka se ne vraca ni u jednom odgovoru', async () => {
+  test('the password is never returned in any response', async () => {
     const res = await api('/auth/register', { method: 'POST', body: READER });
     const serialised = JSON.stringify(res.body);
     assert.ok(!serialised.includes('passwordHash'), 'hash u odgovoru');
     assert.ok(!serialised.includes(READER.password), 'lozinka u odgovoru');
   });
 
-  test('kratka lozinka se odbija', async () => {
+  test('a short password is refused', async () => {
     const res = await api('/auth/register', {
       method: 'POST', body: { ...READER, password: 'kratka' }
     });
     assert.equal(res.status, 400);
   });
 
-  test('sesija stize kao httpOnly kolacic', async () => {
+  test('the session arrives as an httpOnly cookie', async () => {
     const res = await api('/auth/register', { method: 'POST', body: READER });
     const cookie = res.setCookie.find((c) => c.startsWith('octava_session'));
     assert.ok(cookie, 'nema kolacica sesije');
@@ -144,8 +144,8 @@ describe('prijava', () => {
   });
 });
 
-describe('vidljivost skica', () => {
-  test('posjetilac ne vidi neobjavljeno', async () => {
+describe('draft visibility', () => {
+  test('a visitor does not see unpublished work', async () => {
     const token = await makeEditor();
     await api('/songs', {
       method: 'POST', token,

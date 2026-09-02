@@ -6,9 +6,9 @@ import '../../src/models/Artist.js';
 import Song from '../../src/models/Song.js';
 import { applyQualityGate } from './song_quality_gate.js';
 import { toLatin } from '../../src/utils/latinise.js';
-import { potvrdi } from '../lib/potvrdi.js';
+import { confirmDestructive } from '../lib/confirm.js';
 
-potvrdi('skida tekstove pjesama s tekstovi.net, tekstomanija.com i genius.com');
+confirmDestructive('downloads song lyrics from tekstovi.net, tekstomanija.com and genius.com');
 
 /**
  * Lyrics Completer:

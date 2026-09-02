@@ -18,7 +18,7 @@
  * trashed. These songs are wanted — they are simply not finished, and a draft
  * is exactly that. The catalogue count drops from 14,389 to what is really
  * readable, and the songs stay in the dashboard queue for filling in. See
- * KATALOG.md §7.
+ * CATALOG.md §7.
  */
 import 'dotenv/config';
 import mongoose from 'mongoose';

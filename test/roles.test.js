@@ -29,9 +29,9 @@ async function signIn(role) {
  * later, including the level above them. These check both directions — that
  * a rank is refused what it should not have, and still granted what it should.
  */
-describe('nalozi su samo za superadmina', () => {
+describe('accounts are for the superadmin only', () => {
   for (const role of ['worker', 'admin']) {
-    test(`${role} ne moze do naloga`, async () => {
+    test(`${role} cannot reach accounts`, async () => {
       const token = await signIn(role);
 
       for (const [path, options] of [
@@ -45,7 +45,7 @@ describe('nalozi su samo za superadmina', () => {
     });
   }
 
-  test('superadmin moze', async () => {
+  test('a superadmin can', async () => {
     const token = await signIn('superadmin');
     const users = await api('/accounts/users', { token });
     const staff = await api('/accounts/staff', { token });
@@ -55,14 +55,14 @@ describe('nalozi su samo za superadmina', () => {
     assert.ok(Array.isArray(users.body.users));
   });
 
-  test('bez prijave nista', async () => {
+  test('nothing without signing in', async () => {
     const res = await api('/accounts/users');
     assert.equal(res.status, 401);
   });
 });
 
-describe('rang nasljedjuje nizi nivo', () => {
-  test('worker unosi pjesme, ali ne brise', async () => {
+describe('a rank inherits the level below it', () => {
+  test('a worker adds songs but does not delete', async () => {
     const token = await signIn('worker');
 
     const created = await api('/songs', {
@@ -75,7 +75,7 @@ describe('rang nasljedjuje nizi nivo', () => {
     assert.equal(removed.status, 403, 'worker obrisao pjesmu');
   });
 
-  test('superadmin brise, iako brisanje trazi admina', async () => {
+  test('a superadmin deletes, even though deleting requires an admin', async () => {
     // The check asks for a minimum, so the level above passes without being
     // named anywhere in the route.
     const token = await signIn('superadmin');
@@ -88,8 +88,8 @@ describe('rang nasljedjuje nizi nivo', () => {
   });
 });
 
-describe('zastita od samozakljucavanja', () => {
-  test('ne moze mijenjati vlastiti nalog', async () => {
+describe('protection against locking yourself out', () => {
+  test('cannot change their own account', async () => {
     const token = await signIn('superadmin');
     const list = await api('/accounts/staff', { token });
     const self = list.body.staff.find((s) => s.isSelf);
@@ -102,7 +102,7 @@ describe('zastita od samozakljucavanja', () => {
     assert.equal(res.status, 400);
   });
 
-  test('zadnji superadmin ne moze biti skinut', async () => {
+  test('the last superadmin cannot be demoted', async () => {
     const token = await signIn('superadmin');
     await Staff.create({
       email: 'drugi@test.local', name: 'Drugi', role: 'superadmin',

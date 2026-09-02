@@ -36,8 +36,8 @@ const makeSong = (token, title, extra = {}) =>
     }
   });
 
-describe('brisanje u korpu', () => {
-  test('obrisana pjesma nestaje sa javnog spiska i detalja', async () => {
+describe('trashing', () => {
+  test('a trashed song disappears from the public listing and detail page', async () => {
     const admin = await login('admin');
     const { body } = await makeSong(admin, 'Za brisanje');
     const { slug } = body.song;
@@ -52,7 +52,7 @@ describe('brisanje u korpu', () => {
     assert.equal(list.body.songs.some((s) => s.slug === slug), false);
   });
 
-  test('dokument i dalje postoji, samo je oznacen', async () => {
+  test('the document still exists, it is only marked', async () => {
     const admin = await login('admin');
     const { body } = await makeSong(admin, 'Jos tu');
     await api(`/songs/${body.song.slug}`, { method: 'DELETE', token: admin });
@@ -64,7 +64,7 @@ describe('brisanje u korpu', () => {
     assert.ok(raw.deletedBy);
   });
 
-  test('nalazi se u korpi i vraca se nazad', async () => {
+  test('it is found in the trash and restored', async () => {
     const admin = await login('admin');
     const { body } = await makeSong(admin, 'Povratnik');
     const { slug } = body.song;
@@ -81,7 +81,7 @@ describe('brisanje u korpu', () => {
     assert.equal((await api('/songs/trash', { token: admin })).body.songs.length, 0);
   });
 
-  test('brojaci izvodjaca prate brisanje i vracanje', async () => {
+  test('artist counters follow trashing and restoring', async () => {
     const admin = await login('admin');
     const { body } = await makeSong(admin, 'Brojac');
     const { slug, artist } = body.song;
@@ -94,7 +94,7 @@ describe('brisanje u korpu', () => {
     assert.equal((await Artist.findById(artistId)).songCount, 1);
   });
 
-  test('statistika ne broji obrisane', async () => {
+  test('the stats do not count trashed rows', async () => {
     const admin = await login('admin');
     await makeSong(admin, 'Ostaje');
     const { body } = await makeSong(admin, 'Odlazi');
@@ -106,8 +106,8 @@ describe('brisanje u korpu', () => {
   });
 });
 
-describe('trajno uklanjanje', () => {
-  test('trazi da pjesma prvo bude u korpi', async () => {
+describe('permanent removal', () => {
+  test('requires the song to be in the trash first', async () => {
     const root = await login('superadmin');
     const { body } = await makeSong(root, 'Ziva');
 
@@ -116,7 +116,7 @@ describe('trajno uklanjanje', () => {
     assert.ok(await Song.findById(body.song._id));
   });
 
-  test('admin ne smije, superadmin smije', async () => {
+  test('an admin may not, a superadmin may', async () => {
     const admin = await login('admin');
     const root = await login('superadmin');
     const { body } = await makeSong(admin, 'Za uklanjanje');
@@ -132,7 +132,7 @@ describe('trajno uklanjanje', () => {
 });
 
 describe('audit log', () => {
-  test('biljezi brisanje i vracanje, sa imenom pjesme', async () => {
+  test('records trashing and restoring, with the song name', async () => {
     const admin = await login('admin');
     const { body } = await makeSong(admin, 'Pod nadzorom');
     const { slug } = body.song;
@@ -167,7 +167,7 @@ describe('audit log', () => {
     assert.ok(changes.find((c) => c.field === 'status' && c.to === 'draft'));
   });
 
-  test('ime pjesme prezivi trajno uklanjanje', async () => {
+  test('the song name survives permanent removal', async () => {
     const root = await login('superadmin');
     const { body } = await makeSong(root, 'Nestala zauvijek');
     const { slug } = body.song;
@@ -178,14 +178,14 @@ describe('audit log', () => {
     assert.equal(log.body.entries[0].entityLabel, 'Nestala zauvijek');
   });
 
-  test('radnik ne vidi trag', async () => {
+  test('a worker does not see the audit trail', async () => {
     const worker = await login('worker');
     assert.equal((await api('/audit', { token: worker })).status, 403);
   });
 });
 
-describe('grupne izmjene', () => {
-  test('mijenja status na vise pjesama odjednom', async () => {
+describe('bulk edits', () => {
+  test('changes status on several songs at once', async () => {
     const worker = await login('worker');
     const a = await makeSong(worker, 'Prva');
     const b = await makeSong(worker, 'Druga');
@@ -200,7 +200,7 @@ describe('grupne izmjene', () => {
     assert.equal(await Song.countDocuments({ status: 'draft' }), 2);
   });
 
-  test('dodavanje zanra ne naduva brojac kad se ponovi', async () => {
+  test('adding a genre does not inflate the counter when repeated', async () => {
     const worker = await login('worker');
     const genre = await Genre.create({ name: 'Rok', slug: 'rok', kind: 'style' });
     const a = await makeSong(worker, 'Jedna');
@@ -214,7 +214,7 @@ describe('grupne izmjene', () => {
     assert.equal((await Genre.findById(genre._id)).songCount, 1);
   });
 
-  test('grupno brisanje salje u korpu, ne unistava', async () => {
+  test('a bulk delete sends to the trash, it does not destroy', async () => {
     const admin = await login('admin');
     const a = await makeSong(admin, 'Grupno A');
     const b = await makeSong(admin, 'Grupno B');
@@ -228,7 +228,7 @@ describe('grupne izmjene', () => {
     assert.equal(await Song.countDocuments().setOptions({ withDeleted: true }), 2);
   });
 
-  test('odbija nepoznatu radnju i praznu listu', async () => {
+  test('refuses an unknown action and an empty list', async () => {
     const worker = await login('worker');
     const a = await makeSong(worker, 'Nesto');
 
@@ -241,7 +241,7 @@ describe('grupne izmjene', () => {
     })).status, 400);
   });
 
-  test('biljezi se kao jedan zapis sa brojem', async () => {
+  test('is recorded as a single entry with a count', async () => {
     const admin = await login('admin');
     const a = await makeSong(admin, 'X');
     const b = await makeSong(admin, 'Y');

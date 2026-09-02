@@ -71,12 +71,12 @@ const waitFor = (socket, event, ms = 8000) => new Promise((resolve, reject) => {
   socket.once(event, (payload) => { clearTimeout(timer); resolve(payload); });
 });
 
-describe('pristup', () => {
-  test('bez tokena se ne moze spojiti', async () => {
+describe('access', () => {
+  test('no token, no connection', async () => {
     await assert.rejects(open(undefined), /unauthorized/);
   });
 
-  test('istekao token prekida vec otvoren socket na slanju', async () => {
+  test('an expired token cuts an already open socket on send', async () => {
     /*
      * socket.io verifies credentials once, at the handshake, and the connection
      * then lives as long as the network holds it. A staff session lasts sixty
@@ -120,19 +120,19 @@ describe('pristup', () => {
     assert.equal(await ChatMessage.countDocuments({ body: 'poslije isteka' }), 0);
   });
 
-  test('izmisljen token se odbija', async () => {
+  test('a made-up token is refused', async () => {
     await assert.rejects(open('ovo.nije.token'), /unauthorized/);
   });
 
-  test('deaktiviran nalog se ne moze spojiti', async () => {
+  test('a deactivated account cannot connect', async () => {
     const a = await signIn('worker', 'ugasen');
     await Staff.updateOne({ _id: a.id }, { active: false });
     await assert.rejects(open(a.token), /unauthorized/);
   });
 });
 
-describe('prisutnost', () => {
-  test('drugi vide kad neko dodje i kad ode', async () => {
+describe('presence', () => {
+  test('others see when someone arrives and when they leave', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -151,7 +151,7 @@ describe('prisutnost', () => {
     }
   });
 
-  test('spisak prisutnih stize odmah po spajanju', async () => {
+  test('the presence list arrives right after connecting', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -170,7 +170,7 @@ describe('prisutnost', () => {
    * AI-TRAP: two tabs are one person. Closing one must not announce that they
    * left, or a colleague reads "offline" while they are still typing.
    */
-  test('drugi tab ne javlja odlazak', async () => {
+  test('a second tab does not announce a departure', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -194,8 +194,8 @@ describe('prisutnost', () => {
   });
 });
 
-describe('poruke', () => {
-  test('poruka stize primaocu i sprema se', async () => {
+describe('messages', () => {
+  test('a message reaches the recipient and is stored', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -217,7 +217,7 @@ describe('poruke', () => {
     }
   });
 
-  test('posiljalac je vidi i u svom drugom tabu', async () => {
+  test('the sender sees it in their other tab too', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -234,7 +234,7 @@ describe('poruke', () => {
     }
   });
 
-  test('prazna poruka se odbija', async () => {
+  test('an empty message is refused', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
     const s = await open(a.token);
@@ -248,7 +248,7 @@ describe('poruke', () => {
     }
   });
 
-  test('ne moze se pisati samom sebi', async () => {
+  test('you cannot message yourself', async () => {
     const a = await signIn('admin', 'ana');
     const s = await open(a.token);
     try {
@@ -263,7 +263,7 @@ describe('poruke', () => {
    * AI-TRAP: a socket authenticates once and stays open for hours. Deactivating
    * an account has to take effect on the next message, not on the next login.
    */
-  test('deaktiviran nalog vise ne moze slati preko vec otvorenog socketa', async () => {
+  test('a deactivated account can no longer send over an already open socket', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
     const s = await open(a.token);
@@ -279,13 +279,13 @@ describe('poruke', () => {
   });
 });
 
-describe('ogranicenje slanja', () => {
+describe('send rate limit', () => {
   /**
    * AI-TRAP: express-rate-limit guards routes, and a socket event is not one.
    * Without this ceiling an authenticated account in a loop writes to the
    * database as fast as the network allows, past every limit the API sets.
    */
-  test('poplava se zaustavlja, i baza ne primi visak', async () => {
+  test('a flood is stopped, and the database takes no overflow', async () => {
     const a = await signIn('worker', 'brzi');
     const b = await signIn('admin', 'meta');
     const s = await open(a.token);
@@ -307,7 +307,7 @@ describe('ogranicenje slanja', () => {
     }
   });
 
-  test('ogranicenje je po nalogu, ne po svima', async () => {
+  test('the limit is per account, not across everyone', async () => {
     const a = await signIn('worker', 'prvi');
     const b = await signIn('worker', 'drugi');
     const c = await signIn('admin', 'primalac');
@@ -329,8 +329,8 @@ describe('ogranicenje slanja', () => {
   });
 });
 
-describe('citanje', () => {
-  test('otvaranje razgovora javlja posiljaocu da je proicitano', async () => {
+describe('read receipts', () => {
+  test('opening a conversation tells the sender it was read', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
 
@@ -353,7 +353,7 @@ describe('citanje', () => {
     }
   });
 
-  test('nepricitane se broje po sagovorniku', async () => {
+  test('unread messages are counted per correspondent', async () => {
     const a = await signIn('admin', 'ana');
     const b = await signIn('worker', 'bane');
     const from = await open(a.token);
