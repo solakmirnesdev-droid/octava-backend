@@ -96,8 +96,8 @@ Ostale, zasebne popravke:
 
 ```bash
 node scripts/maintenance/doctor.js --write            # izvedena polja
-node scripts/maintenance/popravi-oznake.js --write    # akord slijepljen s oznakom
-node scripts/maintenance/skloni-nespremne.js --write  # prazne i siročad -> draft
+node scripts/maintenance/fix-section-labels.js --write    # akord slijepljen s oznakom
+node scripts/maintenance/unpublish-incomplete.js --write  # prazne i siročad -> draft
 ```
 
 ### Paralelni rad — dionice
@@ -128,8 +128,8 @@ postoje za **agentski rad**, kad više sesija polira tekstove.
 | `scripts/lib/potvrdi.js` | brava ispred skripti koje trajno brišu |
 | `src/utils/tidyContent.js` | razmaci i crtice; **ne dira redove akorada** |
 | `scripts/maintenance/doctor.js` | izvedena polja i brojači |
-| `scripts/maintenance/popravi-oznake.js` | akord slijepljen s oznakom |
-| `scripts/maintenance/skloni-nespremne.js` | prazne i siročad → draft |
+| `scripts/maintenance/fix-section-labels.js` | akord slijepljen s oznakom |
+| `scripts/maintenance/unpublish-incomplete.js` | prazne i siročad → draft |
 | `scripts/maintenance/quality.js` | spisak pjesama po nalazu |
 
 Novo pravilo ide **samo** u `scripts/lib/kvalitet.js`.
@@ -281,9 +281,9 @@ Backup prije svega: `octava-2026-08-31T03-51-57.ejson.gz`, 26,4 MB.
 | korak | učinak |
 |---|---|
 | mehaničke popravke | 4.196 pjesama (3.221 razmaci, 961 oznake, 552 potpisi) |
-| `popravi-oznake` | 600 pjesama, 604 reda |
+| `fix-section-labels` | 600 pjesama, 604 reda |
 | `doctor` | brojači + 31 zastario `searchName` |
-| `skloni-nespremne` | **1.030 pjesama s objave u draft** |
+| `unpublish-incomplete` | **1.030 pjesama s objave u draft** |
 | `ocjeni` | svih 14.384 |
 
 **Besprijekornih: 3.785 → 5.642 (26,3% → 39,2%).**
@@ -298,11 +298,11 @@ koje dijele YouTube video. Oboje traži ručnu odluku.
 |---|---|
 | `popravi --write` | 8.188 pjesama: razmaci, crtice, interpunkcija |
 | prevod oznaka | 789 `[Chorus]`/`[Verse]` → `[Refren]`/`[Strofa]` |
-| `popravi-oznake --write` | **600 pjesama**, 604 reda; provjereno: **0 akorada izgubljeno** |
+| `fix-section-labels --write` | **600 pjesama**, 604 reda; provjereno: **0 akorada izgubljeno** |
 | uklanjanje potpisa | 555 redova transkribenata (uklj. jednu tuđu e-mail adresu) |
 | `doctor --write` | searchTitle 1.052, akordi 1.592, searchLyrics 4.497, tagovi 609, `searchName` 31 |
 | `ocjeni --write` | ocjena na svih 14.388 |
-| `skloni-nespremne --write` | 90 pjesama s objave u draft (11 praznih, 79 siročadi) |
+| `unpublish-incomplete --write` | 90 pjesama s objave u draft (11 praznih, 79 siročadi) |
 
 **Besprijekornih: 1.789 → 5.950.**
 
