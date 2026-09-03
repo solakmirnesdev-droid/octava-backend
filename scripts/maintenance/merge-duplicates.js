@@ -1,9 +1,9 @@
 /**
  * Sends duplicate songs to the trash, keeping the best copy of each.
  *
- *   node scripts/maintenance/spoji-duplikate.js            # prijedlog
- *   node scripts/maintenance/spoji-duplikate.js --write
- *   node scripts/maintenance/spoji-duplikate.js --write --atlas
+ *   node scripts/maintenance/merge-duplicates.js            # prijedlog
+ *   node scripts/maintenance/merge-duplicates.js --write
+ *   node scripts/maintenance/merge-duplicates.js --write --atlas
  *
  * A duplicate group is one searchTitle under one artist appearing more than
  * once among the living rows.

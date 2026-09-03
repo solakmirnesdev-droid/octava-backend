@@ -330,8 +330,19 @@ Still open on Atlas: **57 living duplicate groups** (locally there are 0) and
 This needs content, not cleanup. **Do not invent lyrics or chords.** Work in
 shards.
 
-**Step 2 — `nema-refren` (7,548).** Check whether the chorus is unlabeled or
-the song simply has none. Both exist; this is not automatically fixable.
+**Step 2 — `nema-refren` (8,271). NOT SCRIPTABLE — measured.**
+"Find the verbatim repeated section and label it `[Refren]`" sounds workable and
+is not. On a 3,000-song sample carrying this flag:
+
+| | count | share |
+|---|---|---|
+| has a verbatim repeated section | 282 | **9.4%** |
+| does not | 2,718 | 90.6% |
+| **has only ONE section in total** | **1,487** | **50%** |
+
+For half of them the problem is not an unlabeled chorus — the lyrics were never
+split into sections at all, so there is nothing to compare. A script would be
+guessing in 90% of cases. By hand, in shards.
 
 **Step 3 — `prazna-pjesma` (1,286).** A title with no lyrics. **1,275 are
 already in draft** and not publicly visible; the 11 published ones were pulled.
@@ -349,11 +360,27 @@ deliberate, sometimes the numbering is broken — it has to be looked at.
 **Step 6 — 1,061 songs share a YouTube video.** Sometimes correct (a live
 medley), sometimes a misassigned video. By hand.
 
+**Step 7 — song duplicates: DONE 2026-09-03.** Atlas held 57 living groups
+(116 rows: 70 from `2akordi.net`, 38 from `pesmarica.rs`, 7 with no source).
+Merged with `scripts/maintenance/merge-duplicates.js` — 59 copies to the trash,
+not one of them had a single view or favourite. Remaining: **0**. Living songs
+14,385 → 14,326.
+
+The survivor is chosen in this order: **an unscraped row beats a scraped one**
+(that row is Mirnes's own work; the scraped copy can be fetched again), then a
+higher `quality.score`, then longer content, then the older `_id`. Losers are
+**soft**-deleted and come back from the trash.
+
 ### What NOT to do
 
-- **Song duplicates: 0 living groups.** The 1,164/1,200 from earlier reports
-  were an artifact of aggregation counting the trash (§5.12). There is nothing
-  to merge.
+- **Never build a scraper.** Pulling another site's catalog of lyrics and
+  transcriptions — `tacnaharmonija.rs`, `pesmarica.rs`, `genius.com` — is not
+  work that happens here. That is why `lyrics_completer.js` was taken out of the
+  nightly run and locked on 2026-08-31 (§6). Asked again on 2026-09-03 and
+  declined again.
+- **Song duplicates: no living groups.** Note that the 1,164/1,200 in reports
+  before 2026-09-03 were an artifact of aggregation counting the trash (§5.12);
+  the 57 real ones were merged on 2026-09-03, see Step 7.
 - **Artist duplicates: 0 living.** After the `searchName` repair not one group
   was left.
 
