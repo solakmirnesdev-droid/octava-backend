@@ -28,7 +28,7 @@ import 'dotenv/config';
 import Song from '../src/models/Song.js';
 import Artist from '../src/models/Artist.js';
 import { connect, sweep } from './lib/sweep.js';
-import { RULES, judge } from './lib/kvalitet.js';
+import { RULES, judge, isChord } from './lib/kvalitet.js';
 import { citajRadnika, mojaDionica } from './lib/dionica.js';
 import { tidyContent } from '../src/utils/tidyContent.js';
 
@@ -177,12 +177,13 @@ function prevediOznaku(label) {
 
 /** A line that is a transcription credit and nothing else. */
 const POTPIS =
-  /\b(akordi|tabovi?|tekst)\s+by\s+[A-ZČĆŠĐŽ]|\b(transkripcij|obradio|priredio)|\b(tekst|muzika|glazba|autor|aranžman|aranzman)\s*:|(https?:\/\/|www\.)/i;
+  /\b(akordi|tabovi?|tekst)\s+by\s+[A-ZČĆŠĐŽ]|\b(transkripcij|obradio|priredio)|\b(tekst|muzika|glazba|autor|aranžman|aranzman)\s*:|(https?:\/\/|www\.)|[\w.+-]+@[\w-]+\.[a-z]{2,}/i;
 
 async function popravi() {
   let bezRazmaka = 0;
   let prevedeno = 0;
   let potpisa = 0;
+  let zagrada = 0;
 
   const r = await sweep({
     model: Song,
@@ -224,6 +225,19 @@ async function popravi() {
         .join('\n');
       poslije = bezPotpisa;
 
+      /*
+       * 4. a chord that lost its opening bracket — [Am]D] was [Am][D].
+       *
+       * AI-TRAP: only when the leftover parses as a chord. 178 of the 1,956
+       * sites took a letter of the lyric with the bracket ("]jG]", "]m]") and
+       * restoring those would invent a chord where a word ended. Leave them.
+       */
+      poslije = poslije.replace(/\]([^\[\]\s]{1,12})\]/g, (whole, t) => {
+        if (!isChord(t)) return whole;
+        zagrada++;
+        return `][${t}]`;
+      });
+
       if (poslije === prije) return null;
       return { 'arrangements.0.content': poslije };
     }
@@ -233,6 +247,7 @@ async function popravi() {
   console.log(`     razmaci/crtice/interpunkcija : ${bezRazmaka}`);
   console.log(`     prevedene oznake             : ${prevedeno}`);
   console.log(`     uklonjeni potpisi            : ${potpisa}`);
+  console.log(`     vraćene zagrade akorada      : ${zagrada}`);
 
   /*
    * AI-NOTE: kvar-u-oznaci (3,523 songs) is deliberately NOT repaired here.

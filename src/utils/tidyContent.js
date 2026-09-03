@@ -18,6 +18,28 @@
 /** A line whose every bracket is stripped and nothing but spaces remains. */
 const isChordOnly = (line) => line.replace(/\[[^\]]*\]/g, '').trim() === '';
 
+/**
+ * A tablature row. Strip the chords and what is left is notation, never words.
+ *
+ * AI-TRAP: tab rows must NOT go through the whitespace pass, and learning that
+ * cost 52 songs on both databases. `-{2,}` collapses to a space and ` {2,}` to
+ * one, so `|--0---------|-----0-0-0--|` became `| 0 | 0-0-0 |`, and a row that
+ * was all dashes became `| | | |`. Verified against the 2026-08-30 backup:
+ * decimen, zastave and klatno each lost their tab, and zastave lost an [F]
+ * with it. The fret numbers survive; the dashes are the timing, and the timing
+ * is the half that cannot be guessed back.
+ *
+ * Measured before it was trusted: 514 songs, 2,262 rows. The only rows here
+ * carrying letters spell `xxxx`, which is tab for a muted string. No lyric
+ * line matches, because a lyric line has a word in it.
+ */
+export const isTabLine = (line) => {
+  const bare = line.replace(/\[[^\]]*\]/g, '');
+  if (!bare.includes('|') || !/[-\d]/.test(bare)) return false;
+  if (!/^[\s|.\-\d~^*()/\\xhpbrst]*$/i.test(bare)) return false;
+  return (bare.match(/\|/g) || []).length >= 2 || (bare.match(/-/g) || []).length >= 3;
+};
+
 export function tidyContent(content) {
   if (!content) return content;
 
@@ -25,7 +47,7 @@ export function tidyContent(content) {
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => {
-      if (isChordOnly(line)) return line.replace(/\s+$/, '');
+      if (isChordOnly(line) || isTabLine(line)) return line.replace(/\s+$/, '');
 
       return line
         // A tab is a doubled space wearing a different hat.

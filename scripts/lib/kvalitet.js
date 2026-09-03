@@ -20,6 +20,24 @@
 const CHORD = /^[A-H][#b]?(?:m|maj|min|dim|aug|sus|add)?\d{0,2}(?:\/[A-H][#b]?)?$/;
 export const isChord = (t) => CHORD.test(String(t).trim());
 
+/** Section keywords, in both the house vocabulary and the imported English. */
+const SEKCIJA = /^(strofa|refren|uvod|kraj|prelaz|solo|verse|chorus|bridge|intro|outro)\b/i;
+
+/**
+ * Labels with a chord driven through the middle of the word: [Strof[F]a 1].
+ *
+ * AI-TRAP: the existing kvar-u-oznaci pattern anchors on the keyword sitting
+ * flush against the opening bracket, so it sees [Strofa [G]1] and misses
+ * [Strof[F]a 1] and [Ver[Dsus4]se 1] — the chord split the keyword itself and
+ * there is no longer a whole word to anchor on. Rebuild the label first, then
+ * ask what it says.
+ */
+export function razbijeneOznake(content) {
+  return [...content.matchAll(/\[([^\[\]\n]*\[[^\]\n]*\][^\[\]\n]*)\]/g)]
+    .map((m) => m[1].replace(/\[[^\]]*\]/g, '').trim())
+    .filter((t) => SEKCIJA.test(t));
+}
+
 /** Bracketed tokens that sit alone on a line and are not chords. */
 export function labels(content) {
   return [...content.matchAll(/^[ \t]*\[([^\]]{2,24})\][ \t]*$/gm)]
@@ -65,7 +83,10 @@ export const RULES = [
      * and not a chord in sight. Sampling the matches is what caught it; the
      * count alone looked like a discovery.
      */
-    test: (c) => /\[(strofa|refren|uvod|kraj|prelaz)[^\]\n]*\[/i.test(c) || /\[(strofa|refren)\]{2,}/i.test(c)
+    test: (c) =>
+      /\[(strofa|refren|uvod|kraj|prelaz)[^\]\n]*\[/i.test(c) ||
+      /\[(strofa|refren)\]{2,}/i.test(c) ||
+      razbijeneOznake(c).length > 0
   },
   {
     id: 'sekcija-bez-akorda',
@@ -163,6 +184,57 @@ export const RULES = [
      * of those hits were line breaks and exactly one was a real space.
      */
     test: (c) => /[ \t]+[,.!?;:]/.test(c)
+  },
+  {
+    id: 'pojedena-zagrada',
+    weight: 6,
+    fix: 'skripta',
+    why: 'akord bez otvarajuće zagrade: [Am]D] je bilo [Am][D]',
+    /*
+     * AI-TRAP: repair only when what is left parses AS a chord. Measured over
+     * the catalogue: 1,956 sites in 1,182 songs, 1,778 of the leftovers are
+     * chords. The remaining 178 swallowed a letter of the lyric along with the
+     * bracket — "]jG]", "]m]", "]s]" — and nothing in the text says where the
+     * word ended and the chord began. Those are for a person, not a pass.
+     */
+    test: (c) => [...c.matchAll(/\]([^\[\]\s]{1,12})\]/g)].some((m) => isChord(m[1]))
+  },
+  {
+    id: 'spljostena-tabulatura',
+    weight: 6,
+    fix: 'ručno',
+    why: 'tabulatura svedena na prazne taktove — vraća se iz backupa',
+    /*
+     * AI-NOTE: this is damage tidyContent did before it learned to skip tab
+     * rows (see isTabLine there), not something an importer left behind. The
+     * dashes carried the timing and they are gone, so the row cannot be
+     * rebuilt from itself. Restore these from the 2026-08-30 backup; do not
+     * let anything rewrite them.
+     */
+    test: (c) =>
+      c
+        .split('\n')
+        .some((l) => /^[\s|.]+$/.test(l) && (l.match(/\|/g) || []).length >= 3)
+  },
+  {
+    id: 'mojibake',
+    weight: 3,
+    fix: 'ručno',
+    why: 'UTF-8 pročitan kao Latin-1: Å¡ umjesto š',
+    /*
+     * AI-DECISION: reported, never repaired in bulk. It is 13 songs, and a
+     * mapping table applied to the wrong encoding lays a second layer of
+     * damage over the first. A person fixes thirteen songs sooner than anyone
+     * verifies the table.
+     */
+    test: (c) => /Ä‡|Å¡|Ä‘|Å¾|â€|ï¿½|Ã…|Ã„/.test(c)
+  },
+  {
+    id: 'email-u-tekstu',
+    weight: 3,
+    fix: 'skripta',
+    why: 'tuđa e-mail adresa u tekstu — potpis, ne stih',
+    test: (c) => /[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(c)
   },
   {
     id: 'ponovljena-sekcija',
