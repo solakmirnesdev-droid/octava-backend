@@ -36,11 +36,30 @@ const KORIJEN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
  * front of the running app, not in front of a maintenance script that needs a
  * connection string and nothing else. Reading one key leaves the guard intact.
  */
-export function uriIz(datoteka) {
+export function vrijednostIz(datoteka, kljuc) {
   const put = path.join(KORIJEN, datoteka);
   if (!fs.existsSync(put)) return null;
-  const m = /^\s*MONGODB_URI\s*=\s*(.+)$/m.exec(fs.readFileSync(put, 'utf8'));
+  const m = new RegExp('^\\s*' + kljuc + '\\s*=\\s*(.+)$', 'm').exec(fs.readFileSync(put, 'utf8'));
   return m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
+}
+
+export const uriIz = (datoteka) => vrijednostIz(datoteka, 'MONGODB_URI');
+
+/**
+ * The backup passphrase, from the same file the URI came from.
+ *
+ * AI-TRAP: reading one key out of an env file is deliberate here, but it meant
+ * BACKUP_KEY was never populated at all — so `backup.js` fell through to its
+ * unencrypted branch and wrote the catalogue, every password hash and every
+ * TOTP secret in the clear. Twenty-eight archives had accumulated on Google
+ * Drive that way before anyone noticed, because nothing failed: the file was
+ * simply named without `.enc`.
+ */
+export function backupKljuc(atlas = false) {
+  return process.env.BACKUP_KEY
+    || vrijednostIz(atlas ? '.env.prod' : '.env.dev', 'BACKUP_KEY')
+    || vrijednostIz('.env', 'BACKUP_KEY')
+    || '';
 }
 
 /**

@@ -15,7 +15,7 @@
  * Set BACKUP_KEY to a passphrase and keep it somewhere other than the backup:
  * without it the archive cannot be read, including by you.
  */
-import { ciljanaBaza } from '../lib/sweep.js';
+import { ciljanaBaza, backupKljuc } from '../lib/sweep.js';
 
 /*
  * AI-TRAP: this used `import 'dotenv/config'`, which reads .env and nothing
@@ -41,7 +41,27 @@ const DRIVE = path.join(
 const DEST = process.env.BACKUP_DIR || DRIVE;
 const KEEP_DAYS = Number(process.env.BACKUP_KEEP_DAYS) || 30;
 
-const KEY = process.env.BACKUP_KEY || '';
+const KEY = backupKljuc(NA_ATLASU);
+
+/**
+ * A backup without a key is refused, not written.
+ *
+ * AI-DECISION: this used to fall through to an unencrypted file and say so in
+ * one line of output nobody reads. Twenty-eight archives accumulated on Google
+ * Drive that way — the whole catalogue, every password hash and every TOTP
+ * secret, readable with `gzcat`. A backup that silently drops its encryption is
+ * worse than one that fails, because the failure is the only thing that would
+ * have made somebody look.
+ *
+ * `--allow-plaintext` exists for the one honest case: a throwaway dump of a
+ * local database that holds nothing worth protecting.
+ */
+if (!KEY && !process.argv.includes('--allow-plaintext')) {
+  console.error('BACKUP_KEY nije postavljen — backup bi bio nešifrovan i sadrži');
+  console.error('lozinke i TOTP tajne. Postavi ga u .env.dev / .env.prod,');
+  console.error('ili pokreni s --allow-plaintext ako baš to hoćeš.');
+  process.exit(1);
+}
 
 /** AES-256-GCM: encrypts and authenticates, so tampering is detectable. */
 function encrypt(buffer, passphrase) {
