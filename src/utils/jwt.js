@@ -31,7 +31,17 @@ function secret() {
 
 export function signToken(subject, realm, extra = {}, expiresIn = null) {
   return jwt.sign(
-    { sub: subject.toString(), realm, ...extra },
+    /*
+     * AI-DECISION: `iatMs` alongside the standard `iat`.
+     *
+     * `iat` is seconds by spec, and session invalidation compares it against
+     * passwordChangedAt. At second granularity a password changed in the same
+     * second the token was issued left the old session alive — a one-second
+     * window, but on precisely the action taken when somebody believes they are
+     * compromised. Tightening the comparison to `<=` instead would reject the
+     * *new* token too and sign the person out the moment they changed it.
+     */
+    { sub: subject.toString(), realm, iatMs: Date.now(), ...extra },
     secret(),
     { expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || '7d' }
   );

@@ -194,6 +194,37 @@ describe('changing the password', () => {
     assert.equal(old.status, 401, 'stara sesija je prezivjela promjenu lozinke');
   });
 
+  test('a password changed in the same second still ends the old session', async () => {
+    /*
+     * The case that made the test above flaky rather than failing: `iat` is
+     * seconds, so a password changed in the same second the token was issued
+     * compared equal and the old session survived. One second wide, and on the
+     * one action somebody takes when they believe they are compromised.
+     *
+     * Forced rather than waited for: the old test only hit it when the clock
+     * happened to land badly, which is roughly one run in three — the worst
+     * kind of red, because it teaches people to re-run instead of to look.
+     */
+    const { token } = await signUp();
+    const jwt = (await import('jsonwebtoken')).default;
+    const { iat, iatMs } = jwt.decode(token);
+
+    /*
+     * The last millisecond of the token's own second: later than the token by
+     * milliseconds, identical to it by seconds. `iat * 1000 + 500` is not safe
+     * here — iatMs carries the real remainder, which is past 500 half the time.
+     */
+    assert.ok(iatMs, 'token ne nosi iatMs');
+    const sameSecond = new Date(iat * 1000 + 999);
+    assert.ok(sameSecond.getTime() > iatMs, 'promjena mora biti poslije izdavanja');
+    assert.equal(Math.floor(sameSecond.getTime() / 1000), iat, 'ista sekunda');
+
+    await User.updateOne({ email: 'citalac@test.local' }, { $set: { passwordChangedAt: sameSecond } });
+
+    const res = await api('/me', { token });
+    assert.equal(res.status, 401, 'stara sesija je prezivjela promjenu u istoj sekundi');
+  });
+
   test('a new password that is too short is refused', async () => {
     const { token } = await signUp();
     const res = await api('/me/password', {

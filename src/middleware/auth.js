@@ -11,7 +11,18 @@ import Staff from '../models/Staff.js';
  * claim is in seconds, so the comparison is floored to match.
  */
 function issuedBeforePasswordChange(payload, account) {
-  if (!account.passwordChangedAt || !payload.iat) return false;
+  if (!account.passwordChangedAt) return false;
+
+  /*
+   * Milliseconds when the token carries them. `iat` is seconds, so a password
+   * changed in the same second as the token was issued compared equal and the
+   * old session survived — one second wide, on the one action somebody takes
+   * when they think they have been compromised.
+   */
+  if (payload.iatMs) return payload.iatMs < account.passwordChangedAt.getTime();
+
+  // Issued before this claim existed: the old comparison is all there is.
+  if (!payload.iat) return false;
   return payload.iat < Math.floor(account.passwordChangedAt.getTime() / 1000);
 }
 
