@@ -75,6 +75,46 @@ the other. Staff rank is compared, never enumerated: `requireRole('admin')` mean
 
 ## 5. Decision log
 
+### 2026-09-04 — A backup without a key is refused, not written in the clear
+
+- **What was happening:** the hourly launchd job ran `backup.js` with no
+  environment, and `sweep.js` reads only `MONGODB_URI` out of the env file by
+  design — so `BACKUP_KEY` was never populated and `backup.js` took its
+  unencrypted branch. **Thirty-nine archives** had accumulated on Google Drive
+  that way: the whole catalogue, every password hash and every TOTP secret,
+  readable with `gzcat`. Nothing failed; the file was simply named without
+  `.enc`, which is the only difference anybody would have seen.
+- **Fixes:** `backupKljuc()` in `sweep.js` reads the passphrase from the same
+  file the URI comes from, and a missing key now **stops** the backup rather
+  than quietly downgrading it. `--allow-plaintext` covers the one honest case.
+- **The archives left behind** are sealed by `encrypt-plain-backups.js`. None
+  had an encrypted counterpart, so each was the only copy of the moment it held
+  — every one is encrypted, decrypted again and compared byte for byte before
+  the plaintext is removed. 39 sealed, 0 verification failures, 1029 MB.
+- **The job was also backing up the wrong database.** It had no `--atlas`, so
+  since the dev/prod split it had been archiving the local development
+  catalogue rather than production. The plist now passes it.
+- **Left deliberately:** `octava-latest-direct-ready.ejson.gz` is unencrypted by
+  design, as a restore that needs no key. It carries the same secrets, so it is
+  worth a decision — but not one taken silently while nobody is watching.
+
+### 2026-09-04 — The one-second window on a password change
+
+- **`iat` is seconds by spec**, and session invalidation compared it against
+  `passwordChangedAt`. A password changed in the same second the token was
+  issued compared equal, so the old session survived — one second wide, on
+  precisely the action somebody takes when they believe they are compromised.
+- **`<=` would be worse:** it rejects the *new* token too and signs the person
+  out the moment they change their password, which is why the code said `<`.
+  Tokens now carry `iatMs` and the comparison uses it when present; anything
+  issued before the claim existed keeps the old path.
+- **This was also the flaky test.** `the old session stops being valid` failed
+  about one run in three all through 2026-08-30 — the worst kind of red,
+  because it teaches people to re-run rather than to look. The new test forces
+  the same second instead of waiting for the clock: **18/20 with the fix
+  disabled, 20/20 with it.**
+- **Files:** `utils/jwt.js`, `middleware/auth.js`, `test/profile.test.js`.
+
 ### 2026-08-31 — Development writes locally; the cluster is production only
 
 - **What was wrong:** `.env.dev` held the Atlas URI and `.env` held the local
