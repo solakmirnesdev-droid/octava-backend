@@ -268,3 +268,11 @@ export function judge(content) {
     flags: flags.map((f) => f.id)
   };
 }
+
+/*
+ * Ranking and display ask "is something missing that the reader will run into?"
+ * The answer lives in src/utils/songQuality.js, because the API needs it too
+ * and `src/` must not import from `scripts/`. Re-exported here so scripts have
+ * one obvious place to reach for it.
+ */
+export { SMETA_CITAOCU, nepotpuna, stoFali } from '../../src/utils/songQuality.js';

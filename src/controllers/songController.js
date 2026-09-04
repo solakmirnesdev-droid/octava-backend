@@ -15,6 +15,7 @@ import { pushToStaff } from '../realtime/chat.js';
 import { mayReadPaid, paywallOn } from '../middleware/subscription.js';
 import { scoreMatch, SCORE } from '../utils/fuzzy.js';
 import { youtubeId } from '../utils/youtube.js';
+import { nepotpuna } from '../utils/songQuality.js';
 
 /**
  * Fields whose change is worth a line in the audit log.
@@ -187,7 +188,7 @@ export async function search(req, res, next) {
      * discounted so that a song whose own title matches always sorts above one
      * that merely shares a performer with the query.
      */
-    const projection = 'searchTitle views artist';
+    const projection = 'searchTitle views artist quality.flags';
     let rows = await Song.find({
       ...visible,
       $or: [{ searchTitle: pattern }, { artist: { $in: artistHits.map((x) => x.row._id) } }]
@@ -288,10 +289,31 @@ export async function search(req, res, next) {
         };
       })
       .filter((x) => x.score > 0)
-      // Views break ties only. Sorting by them outright — which is what this did
-      // before — let a popular song with an incidental substring outrank the
-      // song the reader actually named.
-      .sort((a, b) => b.score - a.score || (b.row.views || 0) - (a.row.views || 0));
+      /*
+       * Relevance first, then completeness, then views.
+       *
+       * Views break ties only. Sorting by them outright — which is what this did
+       * before — let a popular song with an incidental substring outrank the
+       * song the reader actually named.
+       *
+       * AI-DECISION: the middle term is `nepotpuna()`, not `quality.score`.
+       * The score measures tidiness — a stray double space costs four points —
+       * and a song with a stray space is exactly as useful to somebody holding
+       * a guitar as one without. Ranking on it would push a complete song below
+       * a cosmetically neater one that has no chords over its second verse.
+       * `nepotpuna()` asks the narrower question: is something missing that the
+       * reader will actually run into? 1,208 published songs answer yes. See
+       * scripts/lib/kvalitet.js, SMETA_CITAOCU.
+       *
+       * AI-NOTE: this reorders, it never filters. An incomplete song still
+       * appears for its own title — it just stops outranking a complete one.
+       */
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          Number(nepotpuna(a.row.quality)) - Number(nepotpuna(b.row.quality)) ||
+          (b.row.views || 0) - (a.row.views || 0)
+      );
 
     const total = scored.length;
     const pageIds = scored.slice(paging.skip, paging.skip + paging.limit).map((x) => x.row._id);

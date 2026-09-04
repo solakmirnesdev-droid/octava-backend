@@ -4,6 +4,7 @@ import { uniqueSlug, slugify } from '../utils/slug.js';
 import { toLatin, hasCyrillic } from '../utils/latinise.js';
 import { extractChords } from '../utils/chords.js';
 import { tidyContent } from '../utils/tidyContent.js';
+import { stoFali } from '../utils/songQuality.js';
 
 /**
  * One playable version of a song.
@@ -323,6 +324,18 @@ songSchema.methods.toPublic = function (arrangementId = null, { withContent = fa
     youtubeId: this.youtubeId,
     status: this.status,
     views: this.views || 0,
+
+    /*
+     * What a reader would notice is missing — no chords over a verse, a verse
+     * that stops halfway, no lyrics at all.
+     *
+     * AI-DECISION: only the reader-facing subset ships, never the whole flag
+     * list and never the score. Half the flags are editorial tidiness — a
+     * double space, a stray dash — and a visitor being told a song is "60/100"
+     * because of whitespace would be misled about a song that is perfectly
+     * playable. See src/utils/songQuality.js.
+     */
+    missing: stoFali(this.quality),
     favoriteCount: this.favoriteCount || 0,
 
     // Only where somebody asked for it. See the note above the signature.
